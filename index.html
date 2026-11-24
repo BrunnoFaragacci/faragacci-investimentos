@@ -18962,6 +18962,14 @@ function htmlInteresses() {
   var h = '<div class="barra-sl" style="gap:8px;margin-bottom:10px;"><select id="sel-int-classe" title="Classe do ativo">' + classes.map(function (c) { return '<option value="' + esc(c) + '"' + (c === INT_CLASSE ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
     '<input type="text" id="in-int-ticker" class="in-crit" style="' + (listadaSel ? 'max-width:150px;text-transform:uppercase;' : 'min-width:220px;max-width:300px;') + '" placeholder="' + (listadaSel ? 'Código (ex.: PETR4)' : 'Nome do ativo (ex.: Tesouro IPCA+ 2035)') + '" autocomplete="off">' +
     '<input type="text" id="in-int-obs" class="in-crit" style="min-width:220px;flex:1;max-width:420px;" placeholder="Observação (opcional)" autocomplete="off"><button type="button" class="btn btn-peq" data-int-add="1">+ Adicionar</button></div>';
+  if (!MODO_CLIENTE) {
+    if (!MODELOS_CARREGADOS && !MODELOS_CARREGANDO) carregarModelosInteresse();
+    h += '<div class="barra-sl" style="gap:8px;margin-bottom:10px;flex-wrap:wrap;"><span class="rot-sl">Modelos padronizados</span><select id="sel-modelo-int" title="Modelo de ativos de interesse"><option value="">' + (MODELOS_INT.length ? 'Selecione um modelo' : 'Nenhum modelo salvo') + '</option>' +
+      MODELOS_INT.map(function (m) { return '<option value="' + esc(m.id) + '"' + (m.id === MODELO_SEL ? ' selected' : '') + '>' + esc(m.nome) + ' (' + (m.itens || []).length + ')</option>'; }).join('') + '</select>' +
+      '<button type="button" class="btn btn-peq" data-mod-aplicar="1">Aplicar ao cliente</button><button type="button" class="btn btn-peq" data-mod-excluir="1">Excluir modelo</button>' +
+      '<input type="text" id="in-modelo-nome" class="in-crit" style="min-width:200px;max-width:260px;" placeholder="Nome do modelo" maxlength="80" autocomplete="off"><button type="button" class="btn btn-peq" data-mod-salvar="1">Salvar lista atual como modelo</button></div>';
+    if (MOD_MSG) h += '<p class="card-sub" style="margin:0 0 8px;">' + esc(MOD_MSG) + '</p>';
+  }
   if (INT_MSG) h += '<p class="card-sub" style="color:var(--red);margin:0 0 8px;">' + esc(INT_MSG) + '</p>';
   if (!lista.length) return h + '<p class="vazio">' + (INT_CARREGANDO ? 'Carregando...' : 'Nenhum ativo de interesse cadastrado.') + '</p>';
   var ordem = lista.slice().sort(function (a, b) { var ia = classes.indexOf(a.classe), ib = classes.indexOf(b.classe); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
@@ -19004,9 +19012,82 @@ function removerInteresse(rid) {
     if (r.error && D && R) render();
   });
 }
+// ── Modelos padronizados de ativos de interesse: o assessor salva a lista de um cliente e a aplica a outros (tabela ativos_interesse_modelos) ──
+var MODELOS_INT = [], MODELO_SEL = '', MODELOS_CARREGADOS = false, MODELOS_CARREGANDO = false, MOD_MSG = '';
+function carregarModelosInteresse() {
+  if (!sb || !logado || MODO_CLIENTE || MODELOS_CARREGANDO) return;
+  MODELOS_CARREGANDO = true;
+  sb.from('ativos_interesse_modelos').select('id,nome,itens').order('nome', { ascending: true }).then(function (r) {
+    MODELOS_CARREGANDO = false; MODELOS_CARREGADOS = true;
+    if (r.error) MOD_MSG = 'Não foi possível carregar os modelos: ' + r.error.message; else MODELOS_INT = r.data || [];
+    if (!MODELOS_INT.some(function (m) { return m.id === MODELO_SEL; })) MODELO_SEL = '';
+    if (D && R && ST.aba === 'alocacao') render();
+  });
+}
+function modeloSelecionado() {
+  var s = document.getElementById('sel-modelo-int');
+  MODELO_SEL = s ? s.value : MODELO_SEL;
+  return MODELOS_INT.filter(function (m) { return m.id === MODELO_SEL; })[0] || null;
+}
+function salvarModeloInteresse() {
+  var id = clienteInteresse(), campo = document.getElementById('in-modelo-nome'), nome = campo ? String(campo.value || '').trim() : '';
+  function dizer(m) { MOD_MSG = m; render(); }
+  modeloSelecionado();
+  if (!sb || !logado || MODO_CLIENTE) return;
+  if (!id || INT_ID !== id || !INTERESSES.length) { dizer('Cadastre ao menos um ativo de interesse para o cliente selecionado antes de salvar um modelo.'); return; }
+  var existente = MODELOS_INT.filter(function (m) { return m.nome.toLowerCase() === nome.toLowerCase(); })[0] || null;
+  if (!nome && MODELO_SEL) existente = MODELOS_INT.filter(function (m) { return m.id === MODELO_SEL; })[0] || null;
+  if (existente) nome = existente.nome;
+  if (!nome) { dizer('Informe o nome do modelo.'); return; }
+  if (existente && !window.confirm('O modelo "' + nome + '" já existe. Deseja substituí-lo pela lista atual do cliente?')) return;
+  var itens = INTERESSES.map(function (x) { return { ticker: x.ticker, classe: x.classe || '', observacao: x.observacao || '', percentual: x.percentual === undefined ? null : x.percentual }; });
+  var op = existente ? sb.from('ativos_interesse_modelos').update({ itens: itens, updated_at: new Date().toISOString() }).eq('id', existente.id) : sb.from('ativos_interesse_modelos').insert({ nome: nome, itens: itens });
+  op.then(function (r) {
+    if (r.error) { dizer('Não foi possível salvar o modelo: ' + r.error.message); return; }
+    MOD_MSG = 'Modelo "' + nome + '" salvo com ' + itens.length + ' ativo(s).'; MODELOS_CARREGADOS = false; MODELO_SEL = '';
+    carregarModelosInteresse();
+  });
+}
+function aplicarModeloInteresse() {
+  var id = clienteInteresse(), m = modeloSelecionado();
+  function dizer(t) { MOD_MSG = t; render(); }
+  if (!sb || !logado || MODO_CLIENTE) return;
+  if (!id) { dizer('Selecione um cliente no topo da página para aplicar o modelo.'); return; }
+  if (!m) { dizer('Selecione um modelo.'); return; }
+  if (INT_ID !== id) { dizer('Aguarde o carregamento dos ativos do cliente e tente novamente.'); return; }
+  var classes = classesInteresse(), chave = function (c, t) { return (c || '') + '|' + String(t).toLowerCase(); }, ja = {}, ocupadas = {}, ignoradas = 0, repetidas = 0, linhas = [];
+  INTERESSES.forEach(function (x) { ja[chave(x.classe, x.ticker)] = true; ocupadas[x.classe || ''] = true; });
+  (m.itens || []).forEach(function (it) {
+    if (classes.indexOf(it.classe) === -1) { ignoradas++; return; }
+    if (ja[chave(it.classe, it.ticker)]) { repetidas++; return; }
+    ja[chave(it.classe, it.ticker)] = true;
+    linhas.push({ cliente_id: id, ticker: it.ticker, classe: it.classe, observacao: it.observacao || null, percentual: !ocupadas[it.classe] && typeof it.percentual === 'number' ? it.percentual : null });
+  });
+  if (!linhas.length) { dizer('Nenhum ativo novo a incluir: ' + repetidas + ' já constam na lista do cliente' + (ignoradas ? ' e ' + ignoradas + ' pertencem a classes inexistentes' : '') + '.'); return; }
+  sb.from('ativos_interesse').insert(linhas).then(function (r) {
+    if (r.error) { dizer('Não foi possível aplicar o modelo: ' + r.error.message); return; }
+    MOD_MSG = 'Modelo "' + m.nome + '" aplicado: ' + linhas.length + ' ativo(s) incluído(s)' + (repetidas ? ', ' + repetidas + ' já constavam' : '') + (ignoradas ? ', ' + ignoradas + ' ignorado(s) por classe inexistente' : '') + '.';
+    INT_MSG = ''; INT_ID = ''; carregarInteresses();
+  });
+}
+function excluirModeloInteresse() {
+  var m = modeloSelecionado();
+  function dizer(t) { MOD_MSG = t; render(); }
+  if (!sb || !logado || MODO_CLIENTE) return;
+  if (!m) { dizer('Selecione o modelo a excluir.'); return; }
+  if (!window.confirm('Excluir definitivamente o modelo "' + m.nome + '"? Os clientes que já o receberam não são afetados.')) return;
+  sb.from('ativos_interesse_modelos').delete().eq('id', m.id).then(function (r) {
+    if (r.error) { dizer('Não foi possível excluir o modelo: ' + r.error.message); return; }
+    MOD_MSG = 'Modelo "' + m.nome + '" excluído.'; MODELO_SEL = ''; MODELOS_CARREGADOS = false;
+    carregarModelosInteresse();
+  });
+}
 function aplicarAcaoInteresse(t) {
-  var el = t && t.closest ? t.closest('[data-int-add],[data-int-rm],[data-aporte-toggle]') : null;
+  var el = t && t.closest ? t.closest('[data-int-add],[data-int-rm],[data-aporte-toggle],[data-mod-aplicar],[data-mod-salvar],[data-mod-excluir]') : null;
   if (!el) return false;
+  if (el.hasAttribute('data-mod-aplicar')) { aplicarModeloInteresse(); return true; }
+  if (el.hasAttribute('data-mod-salvar')) { salvarModeloInteresse(); return true; }
+  if (el.hasAttribute('data-mod-excluir')) { excluirModeloInteresse(); return true; }
   if (el.hasAttribute('data-aporte-toggle')) { var ab = ST.aporteAbertas || (ST.aporteAbertas = {}), k = el.getAttribute('data-aporte-toggle'); ab[k] = !ab[k]; if (D && R) render(); return true; }
   if (el.hasAttribute('data-int-add')) adicionarInteresse(); else removerInteresse(el.getAttribute('data-int-rm'));
   return true;
