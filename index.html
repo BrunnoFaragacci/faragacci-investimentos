@@ -291,6 +291,7 @@ h2{font-size:32px;letter-spacing:-.02em;}
       <button type="button" class="btn-nav" id="btn-nav-pesquisa" hidden>Pesquisar ativo ↗</button>
       <button type="button" class="btn-nav" id="btn-nav-carteira-rec">Carteira Recomendada ↗</button>
       <button type="button" class="btn-nav" id="btn-nav-consolidacao">Consolidação de Carteira ↗</button>
+      <button type="button" class="btn-nav" id="btn-nav-mapa-mental" hidden>Mapa Mental ↗</button>
       <div class="nav-dropdown-wrap">
         <button type="button" class="btn-nav nav-dropdown-trigger" id="btn-nav-renda-variavel" aria-expanded="false">Renda Variável <span class="nav-caret">▾</span></button>
         <div class="nav-dropdown" id="dropdown-renda-variavel" hidden>
@@ -10434,6 +10435,8 @@ h2{font-size:32px;letter-spacing:-.02em;}
           if (elNome) elNome.textContent = (r.data && r.data.nome) ? r.data.nome : sessaoAtual.user.email;
           var itemGerenciar = document.getElementById('dd-gerenciar-usuarios');
           if (itemGerenciar) itemGerenciar.hidden = !isMasterAtual;
+          var btnMapa = document.getElementById('btn-nav-mapa-mental');
+          if (btnMapa) btnMapa.hidden = !(sessaoAtual && sessaoAtual.user && sessaoAtual.user.id === '7319b875-622f-4e7c-91bc-96d22ea484a8');
           verificarContaCliente();
         });
       }
@@ -10443,6 +10446,8 @@ h2{font-size:32px;letter-spacing:-.02em;}
       esconderId('auth-logado');
       esconderId('user-dropdown');
       isMasterAtual = false;
+      var btnMapaOff = document.getElementById('btn-nav-mapa-mental');
+      if (btnMapaOff) btnMapaOff.hidden = true;
       document.body.classList.remove('conta-cliente');
       esconderId('alertas-precos');
     }
@@ -20741,6 +20746,228 @@ setMode(mode);
 </html>`);
   }
 
+  function abrirMapaMental() {
+    var win = window.open('', '_blank');
+    if (!win) { alert('Permita pop-ups para este site e tente novamente.'); return; }
+    escreverConteudoJanela(win, `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapa Mental — Clube do Rendimento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fff;--bg-soft:#F4F4F4;--ink:#111111;--ink-soft:#5C5C5C;--line:#E2E2E2;--red:#DC2626;}
+*{box-sizing:border-box;margin:0;padding:0;}
+[hidden]{display:none!important;}
+html,body{height:100%;}
+body{font-family:'Inter','Segoe UI',sans-serif;background:var(--bg-soft);color:var(--ink);font-size:14px;display:flex;flex-direction:column;}
+.topo{background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.topo h1{font-size:18px;font-weight:800;letter-spacing:-.01em;margin-right:8px;}
+.grupo{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.sep{width:1px;height:24px;background:var(--line);}
+button{font-family:inherit;font-size:13px;font-weight:600;padding:7px 12px;border:1px solid var(--ink);background:#fff;color:var(--ink);border-radius:8px;cursor:pointer;}
+button:hover{background:var(--ink);color:#fff;}
+button.ativo{background:var(--ink);color:#fff;}
+button:disabled{opacity:.35;cursor:not-allowed;background:#fff;color:var(--ink);}
+#status{font-size:12px;color:var(--ink-soft);margin-left:auto;}
+#status.erro{color:var(--red);}
+#dica{padding:8px 20px;font-size:12px;color:var(--ink-soft);background:#fff;border-bottom:1px solid var(--line);}
+#cena{flex:1;overflow:auto;padding:24px;background:var(--bg-soft);}
+#msg{padding:40px 24px;text-align:center;color:var(--ink-soft);font-size:15px;}
+svg text{font-family:'Inter','Segoe UI',sans-serif;}
+.no{cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="topo">
+  <h1>Mapa Mental</h1>
+  <div class="grupo">
+    <button type="button" id="b-exp">Expandir tudo</button>
+    <button type="button" id="b-rec">Recolher tudo</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grupo">
+    <button type="button" id="b-menos" title="Reduzir">−</button>
+    <button type="button" id="b-mais" title="Ampliar">+</button>
+    <button type="button" id="b-ajustar">Ajustar à tela</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grupo">
+    <button type="button" id="b-editar">Editar</button>
+    <span class="grupo" id="g-edicao" hidden>
+      <button type="button" id="b-add" disabled>Adicionar subitem</button>
+      <button type="button" id="b-ren" disabled>Renomear</button>
+      <button type="button" id="b-del" disabled>Excluir</button>
+      <button type="button" id="b-sobe" disabled>Subir</button>
+      <button type="button" id="b-desce" disabled>Descer</button>
+    </span>
+  </div>
+  <span id="status"></span>
+</div>
+<div id="dica">Clique em um tópico para expandir ou recolher os itens vinculados. Em modo de edição, clique em um tópico para selecioná-lo e utilize os botões; as alterações são gravadas automaticamente.</div>
+<div id="cena"><div id="msg">Carregando o mapa mental...</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js" referrerpolicy="no-referrer"><\/script>
+<script>
+var sb = supabase.createClient('https://segeufywrjmstfmfscdi.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlZ2V1Znl3cmptc3RmbWZzY2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MzY0OTgsImV4cCI6MjA5ODQxMjQ5OH0.TUrp35SEI2NXdU1ZY7IEcdRm8VLLfLwAVWUtqjafElI');
+var DONO = '7319b875-622f-4e7c-91bc-96d22ea484a8';
+var SESSAO_INICIAL = ${JSON.stringify(sessaoAtual)};
+var NS = 'http://www.w3.org/2000/svg';
+var RAIZ = null, SEL = null, EDIT = false, ZOOM = 1, TS = null, UID = '', LARG_TOTAL = 0, ALT_TOTAL = 0;
+var LH = 17, PADX = 13, PADY = 10, GAPX = 56, GAPY = 10;
+function larg(d) { return d === 0 ? 230 : (d === 1 ? 270 : 330); }
+function cpl(d) { return d === 0 ? 24 : (d === 1 ? 28 : 38); }
+function el(id) { return document.getElementById(id); }
+function status(t, erro) { var s = el('status'); s.textContent = t || ''; s.className = erro ? 'erro' : ''; }
+function linhas(txt, max) {
+  var pal = String(txt || '').split(' '), out = [], atual = '';
+  pal.forEach(function (p) {
+    if (!atual) { atual = p; return; }
+    if ((atual + ' ' + p).length <= max) atual += ' ' + p; else { out.push(atual); atual = p; }
+  });
+  if (atual) out.push(atual);
+  return out.length ? out : [''];
+}
+function marcar(n, d, pai) { n._d = d; n._p = pai; (n.f || []).forEach(function (x) { marcar(x, d + 1, n); }); }
+function visiveis(n) { return n.f && n.f.length && !n.a ? n.f : []; }
+function medir(n) {
+  n._l = linhas(n.t, cpl(n._d)); n._h = n._l.length * LH + PADY * 2; n._w = larg(n._d);
+  var fil = visiveis(n), s = 0;
+  fil.forEach(function (x) { medir(x); s += x._ah; });
+  if (fil.length) s += GAPY * (fil.length - 1);
+  n._ct = s; n._ah = Math.max(n._h, s);
+}
+function posicionar(n, x, y) {
+  n._x = x; n._y = y + (n._ah - n._h) / 2;
+  var fil = visiveis(n), cy = y + (n._ah - n._ct) / 2;
+  fil.forEach(function (c) { posicionar(c, x + n._w + GAPX, cy); cy += c._ah + GAPY; });
+  if (x + n._w > LARG_TOTAL) LARG_TOTAL = x + n._w;
+}
+function criar(tag, attrs) {
+  var e = document.createElementNS(NS, tag);
+  Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+  return e;
+}
+function arestas(n, g) {
+  visiveis(n).forEach(function (c) {
+    var x1 = n._x + n._w, y1 = n._y + n._h / 2, x2 = c._x, y2 = c._y + c._h / 2, xm = (x1 + x2) / 2;
+    g.appendChild(criar('path', { d: 'M' + x1 + ' ' + y1 + ' C' + xm + ' ' + y1 + ' ' + xm + ' ' + y2 + ' ' + x2 + ' ' + y2, fill: 'none', stroke: n._d === 0 ? '#111' : '#9A9A9A', 'stroke-width': n._d === 0 ? 2 : 1.5 }));
+    arestas(c, g);
+  });
+}
+function estilo(d) {
+  if (d === 0) return { fill: '#111111', stroke: '#111111', sw: 1, cor: '#FFFFFF', peso: 800, tam: 15 };
+  if (d === 1) return { fill: '#FFFFFF', stroke: '#111111', sw: 2, cor: '#111111', peso: 700, tam: 14 };
+  if (d === 2) return { fill: '#FFFFFF', stroke: '#9A9A9A', sw: 1.2, cor: '#111111', peso: 600, tam: 13 };
+  return { fill: '#F4F4F4', stroke: '#C8C8C8', sw: 1, cor: '#222222', peso: 500, tam: 13 };
+}
+function nos(n, g) {
+  var e = estilo(n._d), gr = criar('g', { 'class': 'no' }), tem = n.f && n.f.length;
+  if (SEL === n) gr.appendChild(criar('rect', { x: n._x - 5, y: n._y - 5, width: n._w + 10, height: n._h + 10, rx: 14, fill: 'none', stroke: '#111', 'stroke-width': 2, 'stroke-dasharray': '5 4' }));
+  gr.appendChild(criar('rect', { x: n._x, y: n._y, width: n._w, height: n._h, rx: 10, fill: e.fill, stroke: e.stroke, 'stroke-width': e.sw }));
+  n._l.forEach(function (l, i) {
+    var t = criar('text', { x: n._x + PADX, y: n._y + PADY + LH * (i + 1) - 4, fill: e.cor, 'font-size': e.tam, 'font-weight': e.peso });
+    t.textContent = l; gr.appendChild(t);
+  });
+  gr.addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    SEL = n;
+    if (!EDIT && tem) n.a = !n.a;
+    desenhar();
+  });
+  g.appendChild(gr);
+  if (tem && n._d > 0) {
+    var cx = n._x + n._w, cy = n._y + n._h / 2, cg = criar('g', { 'class': 'no' });
+    cg.appendChild(criar('circle', { cx: cx, cy: cy, r: 11, fill: '#111', stroke: '#fff', 'stroke-width': 2 }));
+    var tx = criar('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', fill: '#fff', 'font-size': 11, 'font-weight': 700 });
+    tx.textContent = n.a ? String(n.f.length) : '−'; cg.appendChild(tx);
+    cg.addEventListener('click', function (ev) { ev.stopPropagation(); n.a = !n.a; desenhar(); });
+    g.appendChild(cg);
+  }
+  visiveis(n).forEach(function (c) { nos(c, g); });
+}
+function desenhar() {
+  if (!RAIZ) return;
+  marcar(RAIZ, 0, null);
+  LARG_TOTAL = 0; medir(RAIZ); posicionar(RAIZ, 10, 10);
+  ALT_TOTAL = RAIZ._ah + 20; LARG_TOTAL += 24;
+  var svg = criar('svg', { width: LARG_TOTAL * ZOOM, height: ALT_TOTAL * ZOOM, viewBox: '0 0 ' + LARG_TOTAL + ' ' + ALT_TOTAL });
+  var g = criar('g', {}); arestas(RAIZ, g); nos(RAIZ, g); svg.appendChild(g);
+  svg.addEventListener('click', function () { SEL = null; desenhar(); });
+  var c = el('cena'); c.innerHTML = ''; c.appendChild(svg);
+  var tem = !!SEL, raiz = SEL === RAIZ;
+  el('b-add').disabled = !(EDIT && tem); el('b-ren').disabled = !(EDIT && tem);
+  el('b-del').disabled = !(EDIT && tem && !raiz); el('b-sobe').disabled = !(EDIT && tem && !raiz); el('b-desce').disabled = !(EDIT && tem && !raiz);
+}
+function percorrer(n, fn) { fn(n); (n.f || []).forEach(function (x) { percorrer(x, fn); }); }
+function limpo(n) { var o = { t: n.t }; if (n.f && n.f.length) o.f = n.f.map(limpo); return o; }
+function agendar() {
+  status('Salvando...'); clearTimeout(TS);
+  TS = setTimeout(function () {
+    sb.from('mapa_mental').upsert({ user_id: UID, dados: limpo(RAIZ), updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(function (r) {
+      status(r.error ? 'Não foi possível salvar: ' + r.error.message : 'Alterações salvas.', !!r.error);
+    });
+  }, 700);
+}
+function ajustar() { var c = el('cena'); ZOOM = Math.max(0.3, Math.min(1, (c.clientWidth - 48) / LARG_TOTAL)); desenhar(); }
+el('b-exp').addEventListener('click', function () { percorrer(RAIZ, function (n) { n.a = false; }); desenhar(); });
+el('b-rec').addEventListener('click', function () { percorrer(RAIZ, function (n) { if (n !== RAIZ) n.a = true; }); desenhar(); });
+el('b-mais').addEventListener('click', function () { ZOOM = Math.min(2, ZOOM + 0.1); desenhar(); });
+el('b-menos').addEventListener('click', function () { ZOOM = Math.max(0.3, ZOOM - 0.1); desenhar(); });
+el('b-ajustar').addEventListener('click', ajustar);
+el('b-editar').addEventListener('click', function () {
+  EDIT = !EDIT; this.className = EDIT ? 'ativo' : ''; this.textContent = EDIT ? 'Concluir edição' : 'Editar';
+  el('g-edicao').hidden = !EDIT; if (!EDIT) SEL = null; desenhar();
+});
+el('b-add').addEventListener('click', function () {
+  if (!SEL) return;
+  var t = window.prompt('Texto do novo subitem:', ''); if (!t || !t.trim()) return;
+  (SEL.f = SEL.f || []).push({ t: t.trim() }); SEL.a = false; desenhar(); agendar();
+});
+el('b-ren').addEventListener('click', function () {
+  if (!SEL) return;
+  var t = window.prompt('Novo texto do tópico:', SEL.t); if (!t || !t.trim()) return;
+  SEL.t = t.trim(); desenhar(); agendar();
+});
+el('b-del').addEventListener('click', function () {
+  if (!SEL || !SEL._p) return;
+  if (!window.confirm('Excluir "' + SEL.t + '" e todos os itens vinculados a ele?')) return;
+  var p = SEL._p; p.f = p.f.filter(function (x) { return x !== SEL; }); SEL = null; desenhar(); agendar();
+});
+function mover(dir) {
+  if (!SEL || !SEL._p) return;
+  var a = SEL._p.f, i = a.indexOf(SEL), j = i + dir;
+  if (j < 0 || j >= a.length) return;
+  a.splice(i, 1); a.splice(j, 0, SEL); desenhar(); agendar();
+}
+el('b-sobe').addEventListener('click', function () { mover(-1); });
+el('b-desce').addEventListener('click', function () { mover(1); });
+
+function aviso(t) { el('cena').innerHTML = '<div id="msg">' + t + '</div>'; }
+function iniciar() {
+  var p = SESSAO_INICIAL && SESSAO_INICIAL.access_token ? sb.auth.setSession({ access_token: SESSAO_INICIAL.access_token, refresh_token: SESSAO_INICIAL.refresh_token }) : Promise.resolve(null);
+  p.then(function () { return sb.auth.getUser(); }).then(function (res) {
+    var u = res && res.data && res.data.user;
+    if (!u || u.id !== DONO) { aviso('Acesso restrito. Esta área está disponível somente para o usuário autorizado.'); return; }
+    UID = u.id;
+    return sb.from('mapa_mental').select('dados').eq('user_id', UID).maybeSingle().then(function (r) {
+      if (r.error) { aviso('Não foi possível carregar o mapa mental: ' + r.error.message); return; }
+      if (!r.data || !r.data.dados || !r.data.dados.t) { aviso('Nenhum mapa mental cadastrado.'); return; }
+      RAIZ = r.data.dados;
+      marcar(RAIZ, 0, null);
+      percorrer(RAIZ, function (n) { if (n !== RAIZ && n.f && n.f.length) n.a = true; });
+      ZOOM = 1; desenhar();
+    });
+  }).catch(function (e) { aviso('Não foi possível carregar o mapa mental.'); });
+}
+iniciar();
+<\/script>
+</body>
+</html>`);
+  }
   function abrirInflacaoPessoal() {
     var win = window.open('', '_blank');
     if (!win) { alert('Permita pop-ups para este site e tente novamente.'); return; }
@@ -28616,6 +28843,7 @@ if (btnExportarExcelPesquisa) {
   document.getElementById('btn-nav-opcoes').addEventListener('click', abrirOpcoes);
   document.getElementById('btn-nav-inflacao').addEventListener('click', abrirInflacaoPessoal);
   document.getElementById('btn-nav-dividendos').addEventListener('click', abrirRecuperacaoDividendos);
+  document.getElementById('btn-nav-mapa-mental').addEventListener('click', abrirMapaMental);
   document.getElementById('btn-nav-nota-corretagem').addEventListener('click', abrirNotaCorretagem);
   document.getElementById('btn-nav-cetipados').addEventListener('click', abrirCetipados);
   document.getElementById('btn-nav-pesquisa').addEventListener('click', abrirPesquisaAtivo);
