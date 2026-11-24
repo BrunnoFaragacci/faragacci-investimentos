@@ -284,6 +284,7 @@ h2{font-size:32px;letter-spacing:-.02em;}
           <button type="button" class="nav-dropdown-item" id="btn-nav-consorcio">Consórcio ↗</button>
           <button type="button" class="nav-dropdown-item" id="btn-nav-cartoes">Comparar Cartões ↗</button>
           <button type="button" class="nav-dropdown-item" id="btn-nav-inflacao">Inflação Pessoal ↗</button>
+          <button type="button" class="nav-dropdown-item" id="btn-nav-dividendos">Recuperação do IR sobre Dividendos ↗</button>
         </div>
       </div>
       <!-- "Pesquisar ativo" ocultado do menu; a ferramenta permanece no código. Para reativar, remova o atributo hidden do botão abaixo. -->
@@ -20428,6 +20429,237 @@ setInterval(function () { if (!document.hidden) atualizar(); }, INTERVALO_MS);
 </html>`);
   }
 
+  function abrirRecuperacaoDividendos() {
+    var win = window.open('', '_blank');
+    if (!win) { alert('Permita pop-ups para este site e tente novamente.'); return; }
+    escreverConteudoJanela(win, `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recuperação do imposto sobre dividendos — Clube do Rendimento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fff;--bg-soft:#F4F4F4;--ink:#111111;--ink-soft:#5C5C5C;--line:#E2E2E2;--green:#16A34A;--red:#DC2626;--shadow-sm:0 2px 10px rgba(0,0,0,.05);}
+*{box-sizing:border-box;margin:0;padding:0;}
+[hidden]{display:none!important;}
+body{font-family:'Inter','Poppins','Segoe UI',sans-serif;background:var(--bg-soft);color:var(--ink);min-height:100vh;font-size:15px;}
+.nav{background:#fff;border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:50;}
+.nav-brand{font-weight:700;font-size:15px;}
+.container{max-width:1240px;margin:0 auto;padding:28px 24px 60px;}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;text-transform:uppercase;letter-spacing:.08em;font-size:12px;font-weight:600;margin-bottom:10px;}
+.eyebrow::before{content:"";width:18px;height:2px;background:var(--ink);display:inline-block;}
+h1{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-bottom:8px;line-height:1.12;}
+.sub{font-size:16px;color:var(--ink-soft);margin-bottom:22px;line-height:1.55;max-width:860px;}
+.grade{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:22px;align-items:start;}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 24px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
+.card h2{font-size:16px;font-weight:800;margin-bottom:14px;}
+fieldset{border:0;margin-bottom:18px;display:grid;gap:12px;}
+fieldset:last-child{margin-bottom:0;}
+legend{font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.campo label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-bottom:5px;}
+.campo small{display:block;font-size:11.5px;color:#8a8a8a;margin-top:4px;line-height:1.35;}
+.campo input,.campo select{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink);}
+.campo input:focus,.campo select:focus{outline:none;border-color:var(--ink);}
+.dupla{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;}
+.seg button{font-family:inherit;font-size:13px;font-weight:600;border:0;background:#fff;color:var(--ink);cursor:pointer;padding:10px 6px;}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff;}
+.dica{font-size:12.5px;color:var(--ink-soft);margin-top:8px;line-height:1.45;}
+.dest{background:var(--ink);color:#fff;border-color:var(--ink);}
+.dest .r{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#BDBDBD;margin-bottom:10px;}
+.dest .n{font-size:clamp(40px,6vw,64px);font-weight:800;letter-spacing:-.03em;line-height:1;white-space:nowrap;}
+.dest .m{font-size:16px;margin-top:10px;color:#E5E5E5;line-height:1.5;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:18px;}
+.stats div{border-top:2px solid var(--line);padding-top:8px;}
+.dest .stats div{border-top-color:#444;}
+.stats b{display:block;font-size:19px;white-space:nowrap;}
+.stats span{font-size:12.5px;color:var(--ink-soft);}
+.dest .stats span{color:#BDBDBD;}
+.fig{position:relative;height:340px;}
+.fig svg{position:absolute;inset:0;width:100%;height:100%;}
+.leg{display:flex;flex-wrap:wrap;gap:18px;font-size:13px;margin-top:10px;}
+.leg i{display:inline-block;width:22px;height:0;vertical-align:middle;margin-right:7px;border-top:3px solid var(--ink);}
+.leg i.cz{border-top-color:#9A9A9A;}
+.leg i.tr{border-top-style:dashed;}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+th:first-child,td:first-child{text-align:left;}
+th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);}
+.rolar{overflow-x:auto;}
+.notas p{font-size:13.5px;line-height:1.6;color:var(--ink-soft);margin-bottom:10px;max-width:900px;}
+.notas p.aviso{color:var(--ink);font-weight:600;}
+.pos{color:var(--green);font-weight:600;}.neg{color:var(--red);font-weight:600;}
+@media(max-width:900px){.grade{grid-template-columns:minmax(0,1fr);}h1{font-size:26px;}}
+</style>
+</head>
+<body>
+<div class="nav"><span class="nav-brand">Clube do Rendimento</span></div>
+<div class="container">
+<div class="eyebrow">Simulador</div>
+<h1>Que rentabilidade compensa o imposto de 10% sobre os dividendos?</h1>
+<p class="sub">Compare manter o patrimônio aplicado na empresa com distribuí-lo como dividendos, pagar a retenção na fonte e reinvestir na pessoa física. A ferramenta indica a rentabilidade bruta anual necessária para atingir a meta no prazo escolhido.</p>
+
+<div class="grade">
+<form id="f" class="card" onsubmit="return false">
+<fieldset>
+<legend>Situação atual</legend>
+<div class="campo"><label>Patrimônio aplicado (R$)</label><input id="P" inputmode="decimal" value="8.000.000"></div>
+<div class="dupla">
+<div class="campo"><label>CDI (% a.a.)</label><input id="cdi" inputmode="decimal" value="13,65"></div>
+<div class="campo"><label>% do CDI</label><input id="pa" inputmode="decimal" value="98"></div>
+</div>
+<div class="campo"><label>IR sobre o rendimento atual (%)</label><input id="ta" inputmode="decimal" value="34"></div>
+<div class="campo"><label>Cobrança do IR atual</label>
+<select id="ma"><option value="anual" selected>Anual, sobre o rendimento (pessoa jurídica)</option><option value="resgate">No resgate (pessoa física)</option></select></div>
+</fieldset>
+<fieldset>
+<legend>Distribuição e novo investimento</legend>
+<div class="campo"><label>IR retido sobre os dividendos (%)</label><input id="d" inputmode="decimal" value="10"></div>
+<div class="campo"><label>IR sobre o novo investimento (%)</label><input id="tb" inputmode="decimal" value="15"><small>CDB acima de 2 anos: 15%; LCI, LCA, CRI e CRA: 0%.</small></div>
+<div class="campo"><label>Prazo (anos)</label><input id="X" inputmode="decimal" value="3"></div>
+<div>
+<div class="campo"><label>Meta</label></div>
+<div class="seg" role="group" aria-label="Meta">
+<button type="button" id="m1" aria-pressed="false">Recuperar o imposto</button>
+<button type="button" id="m2" aria-pressed="true">Empatar com o atual</button>
+</div>
+<div class="dica" id="mh"></div>
+</div>
+</fieldset>
+<fieldset>
+<legend>Proposta para a pessoa física</legend>
+<div class="dupla">
+<div class="campo"><label>Indexador</label>
+<select id="ct"><option value="cdi" selected>% do CDI</option><option value="pre">Prefixado (% a.a.)</option><option value="cdimais">CDI + (% a.a.)</option></select></div>
+<div class="campo"><label>Taxa</label><input id="cv" inputmode="decimal" value="110"></div>
+</div>
+<div class="campo"><label>IR sobre a proposta (%)</label><input id="tc" inputmode="decimal" value="15"><small>Pode diferir do campo acima, caso a proposta seja isenta.</small></div>
+</fieldset>
+</form>
+
+<section aria-live="polite">
+<div class="card dest">
+<div class="r">Rentabilidade bruta necessária no novo investimento</div>
+<div class="n" id="rv">–</div>
+<div class="m" id="rs"></div>
+<div class="stats" id="st"></div>
+</div>
+<div class="card">
+<h2>Cenário proposto na pessoa física</h2>
+<div id="cs" style="font-size:16px;line-height:1.5;"></div>
+<div class="stats" id="cst"></div>
+</div>
+<div class="card">
+<h2>Evolução do patrimônio líquido</h2>
+<div class="fig"><svg id="ch" role="img" aria-label="Evolução do patrimônio líquido nos três cenários"></svg></div>
+<div class="leg"><span><i class="cz"></i>Mantido na empresa (líquido)</span><span><i></i>Distribuído e reinvestido à taxa necessária</span><span><i class="tr"></i>Proposta na pessoa física</span></div>
+</div>
+</section>
+</div>
+
+<div class="card">
+<h2>Ano a ano</h2>
+<div class="rolar"><table><thead><tr><th>Ano</th><th>Mantido na empresa</th><th>Distribuído à taxa necessária</th><th>Proposta na pessoa física</th><th>Proposta − atual</th></tr></thead><tbody id="tb2"></tbody></table></div>
+</div>
+
+<div class="card notas">
+<h2>Premissas e cuidados</h2>
+<p>Os valores são líquidos do imposto de renda sobre os rendimentos, no momento de cada ano. No cenário atual, se o imposto for anual, o rendimento líquido é reinvestido todo ano; se for no resgate, o imposto incide uma única vez, sobre o ganho acumulado. No novo investimento, o imposto incide no resgate. O CDI é considerado constante durante todo o prazo.</p>
+<p>A Lei 15.270/2025 prevê retenção de 10% sobre o total distribuído por uma mesma empresa a uma mesma pessoa física quando o valor do mês ultrapassa R$ 50 mil. Na comparação, o cenário atual não considera a futura distribuição dos lucros acumulados na empresa, que também seria tributada quando ocorresse.</p>
+<p class="aviso">A retenção de 10% é antecipação do imposto mínimo anual (IRPFM). Se a empresa já tributa o lucro a uma alíquota efetiva elevada, o redutor previsto na lei pode diminuir ou eliminar o imposto devido no ajuste anual, tornando parte da retenção restituível. Convém validar o caso com o contador antes de apresentá-lo ao cliente.</p>
+<p>Ferramenta de simulação, sem caráter de recomendação.</p>
+</div>
+</div>
+
+<script>
+(function () {
+var $ = function (id) { return document.getElementById(id); };
+function num(v) {
+  v = String(v).trim().replace(/\\s/g, '');
+  if (v.indexOf(',') !== -1) v = v.replace(/\\./g, '').replace(',', '.');
+  else if ((v.match(/\\./g) || []).length > 1 || /\\.\\d{3}$/.test(v)) v = v.replace(/\\./g, '');
+  var n = parseFloat(v);
+  return isFinite(n) ? n : NaN;
+}
+function brl(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }); }
+function pct(v, c) { c = c === undefined ? 2 : c; return (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c }) + '%'; }
+function anosTxt(x) { return x.toLocaleString('pt-BR') + (x === 1 ? ' ano' : ' anos'); }
+var mode = 'empatar', last = null, CAMPOS = ['P', 'cdi', 'pa', 'ta', 'd', 'tb', 'X', 'ma', 'ct', 'cv', 'tc'];
+function grow(P, r, t, tax, how) { return how === 'anual' ? P * Math.pow(1 + r * (1 - tax), t) : P * (1 + (Math.pow(1 + r, t) - 1) * (1 - tax)); }
+function cards(lista) { return lista.map(function (x) { return '<div><b>' + x[0] + '</b><span>' + x[1] + '</span></div>'; }).join(''); }
+function tm(t) {
+  if (t === null) return 'não ocorre em 60 anos';
+  var a = Math.floor(t + 1e-9), m = Math.round((t - a) * 12);
+  return (a ? a + (a === 1 ? ' ano' : ' anos') : '') + (a && m ? ' e ' : '') + (m ? m + (m === 1 ? ' mês' : ' meses') : '');
+}
+function calc() {
+  var P = num($('P').value), cdi = num($('cdi').value) / 100, pa = num($('pa').value) / 100, ta = num($('ta').value) / 100, d = num($('d').value) / 100, tb = num($('tb').value) / 100, X = num($('X').value), ma = $('ma').value;
+  if (![P, cdi, pa, ta, d, tb, X].every(isFinite) || P <= 0 || X <= 0 || d >= 1 || tb >= 1) {
+    $('rv').textContent = '–'; $('rs').textContent = 'Preencha todos os campos com valores válidos.'; $('st').innerHTML = ''; $('cs').textContent = ''; $('cst').innerHTML = ''; $('tb2').innerHTML = ''; return null;
+  }
+  var cd = Math.pow(1 + cdi, 1 / 252) - 1, ra = Math.pow(1 + pa * cd, 252) - 1;
+  var B0 = P * (1 - d), A = grow(P, ra, X, ta, ma), T = mode === 'recuperar' ? P : A;
+  var g = Math.pow(1 + (T / B0 - 1) / (1 - tb), 1 / X) - 1;
+  var netB = Math.pow(T / B0, 1 / X) - 1;
+  var pb = (Math.pow(1 + g, 1 / 252) - 1) / cd;
+  $('mh').textContent = mode === 'recuperar' ? 'Voltar ao valor bruto anterior à distribuição: ' + brl(P) + '.' : 'Atingir o mesmo valor que o patrimônio teria se continuasse aplicado na empresa: ' + brl(A) + '.';
+  $('rv').textContent = pct(g) + ' a.a.';
+  $('rs').innerHTML = 'equivale a <b>' + (pb * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% do CDI</b>, ou <b>' + pct(netB) + ' a.a.</b> líquido de imposto';
+  var liqAtual = ma === 'anual' ? ra * (1 - ta) : Math.pow(1 + (Math.pow(1 + ra, X) - 1) * (1 - ta), 1 / X) - 1;
+  $('st').innerHTML = cards([[brl(P * d), 'imposto retido na distribuição'], [brl(B0), 'valor reinvestido na pessoa física'], [brl(T), 'meta ao fim de ' + anosTxt(X)], [pct(ra) + ' bruto', (pa * 100).toLocaleString('pt-BR') + '% do CDI hoje, rendimento atual'], [pct(liqAtual), 'rendimento atual líquido ao ano']]);
+  var ct = $('ct').value, cv = num($('cv').value) / 100, tc = num($('tc').value) / 100, rc = NaN;
+  if (isFinite(cv) && isFinite(tc) && tc < 1) rc = ct === 'cdi' ? Math.pow(1 + cv * cd, 252) - 1 : (ct === 'pre' ? cv : (1 + cdi) * (1 + cv) - 1);
+  var C = function (t) { return grow(B0, rc, t, tc, 'resgate'); }, Aat = function (t) { return grow(P, ra, t, ta, ma); };
+  function quando(f) { for (var m = 1; m <= 720; m++) { if (f(m / 12)) return m / 12; } return null; }
+  if (isFinite(rc)) {
+    var cpb = (Math.pow(1 + rc, 1 / 252) - 1) / cd, cX = C(X), diff = cX - A;
+    $('cs').innerHTML = 'Rende <b>' + pct(rc) + ' a.a. bruto</b> (' + (cpb * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% do CDI). ' + (rc >= g ? '<span class="pos">Supera</span>' : '<span class="neg">Não alcança</span>') + ' a taxa necessária para a meta no prazo.';
+    $('cst').innerHTML = cards([[tm(quando(function (t) { return C(t) >= P; })), 'para recuperar o imposto'], [tm(quando(function (t) { return C(t) >= Aat(t); })), 'para empatar com o cenário atual'], [brl(cX), 'patrimônio líquido em ' + anosTxt(X)], [(diff >= 0 ? '+' : '−') + brl(Math.abs(diff)), 'diferença sobre o atual no prazo']]);
+  } else { $('cs').textContent = 'Informe a taxa da proposta.'; $('cst').innerHTML = ''; }
+  var n = Math.max(1, Math.ceil(X)), rows = [], t, tt;
+  for (t = 0; t <= n; t++) { tt = Math.min(t, X); rows.push([tt, Aat(tt), grow(B0, g, tt, tb, 'resgate'), isFinite(rc) ? C(tt) : NaN]); }
+  if (rows.length > 1 && rows[rows.length - 1][0] === rows[rows.length - 2][0]) rows.pop();
+  $('tb2').innerHTML = rows.map(function (r) {
+    var c = r[3];
+    return '<tr><td>' + r[0].toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '</td><td>' + brl(r[1]) + '</td><td>' + brl(r[2]) + '</td><td>' + (isFinite(c) ? brl(c) : '–') + '</td><td>' + (isFinite(c) ? brl(c - r[1]) : '–') + '</td></tr>';
+  }).join('');
+  return { P: P, ra: ra, ta: ta, ma: ma, B0: B0, g: g, tb: tb, X: X, T: T, rc: rc, tc: tc };
+}
+var s = $('ch');
+function draw() {
+  if (!last) { s.innerHTML = ''; return; }
+  var L = last, hasC = isFinite(L.rc), W = s.clientWidth, H = s.clientHeight, narrow = W < 520, l = narrow ? 56 : 82, r = 16, tp = 18, b = 34, N = 60, pts = [], i, t;
+  if (!W || !H) return;
+  for (i = 0; i <= N; i++) { t = L.X * i / N; pts.push([t, grow(L.P, L.ra, t, L.ta, L.ma), grow(L.B0, L.g, t, L.tb, 'resgate'), hasC ? grow(L.B0, L.rc, t, L.tc, 'resgate') : NaN]); }
+  var all = []; pts.forEach(function (p) { all.push(p[1], p[2]); if (hasC) all.push(p[3]); });
+  var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all), pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+  var x = function (t) { return l + (W - l - r) * t / L.X; }, y = function (v) { return tp + (H - tp - b) * (1 - (v - lo) / (hi - lo)); };
+  var fmt = function (v) { return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' mi'; };
+  var h = '', ticks = narrow ? 3 : 5, yy, xt = Math.min(Math.ceil(L.X), narrow ? 4 : 8);
+  for (i = 0; i <= ticks; i++) { var v = lo + (hi - lo) * i / ticks; yy = y(v); h += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + yy + '" y2="' + yy + '" stroke="#E2E2E2"/><text x="' + (l - 8) + '" y="' + (yy + 4) + '" text-anchor="end" font-size="12" fill="#5C5C5C">' + fmt(v) + '</text>'; }
+  for (i = 0; i <= xt; i++) { t = L.X * i / xt; h += '<text x="' + x(t) + '" y="' + (H - 10) + '" text-anchor="middle" font-size="12" fill="#5C5C5C">' + (i === 0 ? 'hoje' : t.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' a') + '</text>'; }
+  var path = function (k) { return pts.map(function (p, j) { return (j ? 'L' : 'M') + x(p[0]).toFixed(1) + ',' + y(p[k]).toFixed(1); }).join(''); };
+  h += '<path d="' + path(1) + '" fill="none" stroke="#9A9A9A" stroke-width="3"/><path d="' + path(2) + '" fill="none" stroke="#111" stroke-width="3"/>' + (hasC ? '<path d="' + path(3) + '" fill="none" stroke="#111" stroke-width="2.5" stroke-dasharray="7 5"/>' : '');
+  h += '<circle cx="' + x(L.X) + '" cy="' + y(L.T) + '" r="6" fill="#111" stroke="#fff" stroke-width="2"/>';
+  s.innerHTML = h;
+}
+function run() { last = calc(); draw(); }
+function setMode(m) { mode = m; $('m1').setAttribute('aria-pressed', m === 'recuperar'); $('m2').setAttribute('aria-pressed', m === 'empatar'); run(); }
+$('m1').addEventListener('click', function () { setMode('recuperar'); });
+$('m2').addEventListener('click', function () { setMode('empatar'); });
+$('f').addEventListener('input', run);
+$('f').addEventListener('change', run);
+window.addEventListener('resize', draw);
+setMode(mode);
+})();
+<\/script>
+</body>
+</html>`);
+  }
+
   function abrirInflacaoPessoal() {
     var win = window.open('', '_blank');
     if (!win) { alert('Permita pop-ups para este site e tente novamente.'); return; }
@@ -28302,6 +28534,7 @@ if (btnExportarExcelPesquisa) {
   document.getElementById('btn-nav-valuation').addEventListener('click', abrirValuation);
   document.getElementById('btn-nav-opcoes').addEventListener('click', abrirOpcoes);
   document.getElementById('btn-nav-inflacao').addEventListener('click', abrirInflacaoPessoal);
+  document.getElementById('btn-nav-dividendos').addEventListener('click', abrirRecuperacaoDividendos);
   document.getElementById('btn-nav-nota-corretagem').addEventListener('click', abrirNotaCorretagem);
   document.getElementById('btn-nav-cetipados').addEventListener('click', abrirCetipados);
   document.getElementById('btn-nav-pesquisa').addEventListener('click', abrirPesquisaAtivo);
