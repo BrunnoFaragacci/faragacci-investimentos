@@ -20756,7 +20756,8 @@ button:disabled{opacity:.35;cursor:not-allowed;background:#fff;color:var(--ink);
 #status{font-size:12px;color:var(--ink-soft);margin-left:auto;}
 #status.erro{color:var(--red);}
 #dica{padding:8px 20px;font-size:12px;color:var(--ink-soft);background:#fff;border-bottom:1px solid var(--line);}
-#cena{flex:1;overflow:auto;padding:24px;background:var(--bg-soft);}
+#cena{flex:1;overflow:auto;padding:24px;background:var(--bg-soft);position:relative;}
+.caixa{position:absolute;z-index:5;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);background:#fff;border:2px solid #BC863E;border-radius:10px;padding:8px 12px;box-shadow:0 6px 18px rgba(0,0,0,.18);outline:none;}
 #msg{padding:40px 24px;text-align:center;color:var(--ink-soft);font-size:15px;}
 svg text{font-family:'Inter','Segoe UI',sans-serif;}
 .no{cursor:pointer;}
@@ -20789,7 +20790,7 @@ svg text{font-family:'Inter','Segoe UI',sans-serif;}
   </div>
   <span id="status"></span>
 </div>
-<div id="dica">Clique em um tópico para expandir ou recolher os itens vinculados; arraste um tópico para reposicioná-lo (os itens vinculados o acompanham). O tópico clicado fica em destaque; clique no fundo para retirar o destaque. Use o botão (+) de cada tópico para adicionar um subitem. Em modo de edição, clique em um tópico para selecioná-lo e utilize os botões; as alterações são gravadas automaticamente.</div>
+<div id="dica">Clique em um tópico para expandir ou recolher os itens vinculados; arraste um tópico para reposicioná-lo (os itens vinculados o acompanham). O tópico clicado fica em destaque; clique no fundo para retirar o destaque. Use o botão (+) de cada tópico para adicionar um subitem e clique duas vezes em um tópico para alterar o texto (Enter confirma; Esc cancela). Em modo de edição, clique em um tópico para selecioná-lo e utilize os botões; as alterações são gravadas automaticamente.</div>
 <div id="cena"><div id="msg">Carregando o mapa mental...</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js" referrerpolicy="no-referrer"><\/script>
@@ -20798,7 +20799,7 @@ var sb = supabase.createClient('https://segeufywrjmstfmfscdi.supabase.co', 'eyJh
 var DONO = '7319b875-622f-4e7c-91bc-96d22ea484a8';
 var SESSAO_INICIAL = ${JSON.stringify(sessaoAtual)};
 var NS = 'http://www.w3.org/2000/svg';
-var LIM = { x0: 0, y0: 0, x1: 0, y1: 0 }, ARR = null, RAIZ = null, SEL = null, EDIT = false, ZOOM = 1, TS = null, UID = '', LARG_TOTAL = 0, ALT_TOTAL = 0;
+var CAIXA = null, ALVO_DEL = null, ULTIMO = { n: null, t: 0 }, LIM = { x0: 0, y0: 0, x1: 0, y1: 0 }, ARR = null, RAIZ = null, SEL = null, EDIT = false, ZOOM = 1, TS = null, UID = '', LARG_TOTAL = 0, ALT_TOTAL = 0;
 var LH = 17, PADX = 13, PADY = 10, GAPX = 56, GAPY = 10;
 function larg(d) { return d === 0 ? 264 : (d === 1 ? 304 : 364); }
 function cpl(d) { return d === 0 ? 24 : (d === 1 ? 28 : 38); }
@@ -20872,15 +20873,45 @@ function nos(n, g) {
     cg.appendChild(criar('circle', { cx: cx, cy: cy, r: 11, fill: '#111', stroke: '#fff', 'stroke-width': 2 }));
     var tx = criar('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', fill: '#fff', 'font-size': 11, 'font-weight': 700 });
     tx.textContent = n.a ? String(n.f.length) : '−'; cg.appendChild(tx);
-    cg.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    cg.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); });
     cg.addEventListener('click', function (ev) { ev.stopPropagation(); n.a = !n.a; desenhar(); });
     g.appendChild(cg);
   }
   visiveis(n).forEach(function (c) { nos(c, g); });
 }
+// Edição do texto na própria tela: Enter ou clique fora confirma; Esc cancela
+function encerrar(confirmar, semDesenho) {
+  if (!CAIXA) return;
+  var c = CAIXA; CAIXA = null;
+  var t = c.campo.value.trim(), n = c.no;
+  if (c.campo.parentNode) c.campo.parentNode.removeChild(c.campo);
+  if (confirmar && t) { if (t !== n.t || c.novo) { n.t = t; agendar(); } }
+  else if (c.novo && n._p) { n._p.f = n._p.f.filter(function (x) { return x !== n; }); if (SEL === n) SEL = null; agendar(); }
+  if (!semDesenho) desenhar();
+}
+function editarTexto(n, novo) {
+  desenhar();
+  var svg = el('cena').querySelector('svg'), campo = document.createElement('input');
+  campo.type = 'text'; campo.className = 'caixa'; campo.maxLength = 200;
+  campo.value = novo ? '' : n.t; campo.placeholder = 'Digite o texto e pressione Enter';
+  var cena = el('cena'), rc = cena.getBoundingClientRect(), rs = svg.getBoundingClientRect();   // posição do tópico dentro da área rolável
+  campo.style.left = (rs.left - rc.left + cena.scrollLeft + (n._x - LIM.x0 + 20) * ZOOM) + 'px';
+  campo.style.top = (rs.top - rc.top + cena.scrollTop + (n._y - LIM.y0 + 20) * ZOOM) + 'px';
+  campo.style.width = Math.max(n._w * ZOOM, 300) + 'px';
+  CAIXA = { campo: campo, no: n, novo: novo };
+  campo.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+  campo.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); encerrar(true); }
+    if (ev.key === 'Escape') { ev.preventDefault(); encerrar(false); }
+  });
+  campo.addEventListener('blur', function () { if (CAIXA && CAIXA.campo === campo) encerrar(true); });
+  el('cena').appendChild(campo); campo.focus(); campo.select();
+}
 function adicionarSubitem(n) {
-  var t = window.prompt('Texto do novo subitem de "' + n.t + '":', ''); if (!t || !t.trim()) return;
-  (n.f = n.f || []).push({ t: t.trim() }); n.a = false; desenhar(); agendar();
+  encerrar(true, true);
+  var filho = { t: ' ' };
+  (n.f = n.f || []).push(filho); n.a = false;
+  editarTexto(filho, true);
 }
 function botaoMais(n) {
   var cx = n._x + n._w - 25, cy = n._y + n._h / 2, escuro = SEL === n || n._d === 0;
@@ -20888,12 +20919,14 @@ function botaoMais(n) {
   dica.textContent = 'Adicionar subitem'; b.appendChild(dica);
   b.appendChild(criar('circle', { cx: cx, cy: cy, r: 10, fill: '#FFFFFF', stroke: escuro ? '#FFFFFF' : '#111111', 'stroke-width': 1.2 }));
   b.appendChild(criar('path', { d: 'M' + (cx - 5) + ' ' + cy + ' H' + (cx + 5) + ' M' + cx + ' ' + (cy - 5) + ' V' + (cy + 5), stroke: '#111111', 'stroke-width': 1.8, 'stroke-linecap': 'round', fill: 'none' }));
-  b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+  b.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); });
   b.addEventListener('click', function (ev) { ev.stopPropagation(); adicionarSubitem(n); });
   return b;
 }
 function desenhar() {
   if (!RAIZ) return;
+  encerrar(true, true);
+  if (ALVO_DEL && ALVO_DEL !== SEL) desarmarExclusao();
   marcar(RAIZ, 0, null);
   LIM = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 }; medir(RAIZ); posicionar(RAIZ, 10, 10, 0, 0);
   LARG_TOTAL = LIM.x1 - LIM.x0 + 40; ALT_TOTAL = LIM.y1 - LIM.y0 + 40;
@@ -20929,7 +20962,9 @@ document.addEventListener('pointerup', function () {
   if (a.mov) { agendar(); return; }
   SEL = a.n;
   if (!EDIT && a.tem) a.n.a = !a.n.a;
-  desenhar();
+  var agora = Date.now(), duplo = ULTIMO.n === a.n && agora - ULTIMO.t < 400;
+  ULTIMO = { n: duplo ? null : a.n, t: agora };
+  if (duplo) editarTexto(a.n, false); else desenhar();
 });
 el('cena').addEventListener('pointerdown', function () { if (SEL) { SEL = null; desenhar(); } });   // clique no fundo retira o destaque
 el('b-organizar').addEventListener('click', function () { percorrer(RAIZ, function (n) { delete n.dx; delete n.dy; }); desenhar(); agendar(); });
@@ -20944,15 +20979,16 @@ el('b-editar').addEventListener('click', function () {
   el('g-edicao').hidden = !EDIT; if (!EDIT) SEL = null; desenhar();
 });
 el('b-add').addEventListener('click', function () { if (SEL) adicionarSubitem(SEL); });
-el('b-ren').addEventListener('click', function () {
-  if (!SEL) return;
-  var t = window.prompt('Novo texto do tópico:', SEL.t); if (!t || !t.trim()) return;
-  SEL.t = t.trim(); desenhar(); agendar();
-});
+el('b-ren').addEventListener('click', function () { if (SEL) editarTexto(SEL, false); });
+function desarmarExclusao() { ALVO_DEL = null; el('b-del').textContent = 'Excluir'; el('b-del').className = ''; }
 el('b-del').addEventListener('click', function () {
   if (!SEL || !SEL._p) return;
-  if (!window.confirm('Excluir "' + SEL.t + '" e todos os itens vinculados a ele?')) return;
-  var p = SEL._p; p.f = p.f.filter(function (x) { return x !== SEL; }); SEL = null; desenhar(); agendar();
+  if (ALVO_DEL !== SEL) {   // o primeiro clique pede a confirmação no próprio botão
+    ALVO_DEL = SEL; this.textContent = 'Confirmar exclusão'; this.className = 'ativo';
+    status('Clique novamente para excluir o tópico e os itens vinculados a ele.'); return;
+  }
+  var alvo = SEL, p = alvo._p; desarmarExclusao();
+  p.f = p.f.filter(function (x) { return x !== alvo; }); SEL = null; desenhar(); agendar();
 });
 function mover(dir) {
   if (!SEL || !SEL._p) return;
