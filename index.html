@@ -17652,7 +17652,7 @@ var DG_DRAWDOWN = [2, 4, 7, 10, 15];   // drawdown máximo tolerado (pico ao val
 // Premissas das projeções (ilustrativas; ajuste conforme a metodologia adotada)
 var DG_PREM = { cdi: 10.5, ipca: 4.0, ir: 15, cen: 2.0, anos: 20 };   // CDI e inflação (% a.a.), IR sobre o rendimento (%), variação entre cenários (p.p.) e horizonte (anos)
 var DG_SPREAD = { pos: 0, infl: 0.3, pre: 1.5, multi: 1.5, rvb: 4.0, grv: 3.5, listados: 2.5, alt: 2.0, grf: 0 };   // retorno esperado acima do CDI, por classe (p.p. a.a.)
-var DG_PARCEIRAS = ['XP', 'Ágora', 'Daycoval', 'Santander', 'Bradesco', 'Banco do Brasil', 'C6'];   // instituições citadas na página de instituições parceiras
+
 var DG_GESTORAS = [[/ishares|blackrock/i, 'BlackRock (iShares)'], [/\\bxp\\b/i, 'XP Asset'], [/kinea/i, 'Kinea'], [/\\bverde\\b/i, 'Verde'], [/\\bspx\\b/i, 'SPX'], [/ibiuna/i, 'Ibiuna'], [/legacy/i, 'Legacy'], [/vinci/i, 'Vinci'], [/absolute/i, 'Absolute'], [/alaska/i, 'Alaska'], [/genial/i, 'Genial'], [/\\btrend\\b/i, 'Trend'], [/btg/i, 'BTG Pactual'], [/ita[uú]/i, 'Itaú'], [/bradesco/i, 'Bradesco'], [/santander/i, 'Santander'], [/safra/i, 'Safra'], [/\\bjgp\\b/i, 'JGP'], [/kapitalo/i, 'Kapitalo'], [/\\badam\\b/i, 'Adam'], [/occam/i, 'Occam'], [/dynamo/i, 'Dynamo'], [/opportunity/i, 'Opportunity'], [/bahia/i, 'Bahia AM'], [/sulamerica|sul am[eé]rica/i, 'SulAmérica'], [/tarpon/i, 'Tarpon'], [/constellation/i, 'Constellation'], [/squadra/i, 'Squadra'], [/\\bjive\\b/i, 'Jive'], [/rio bravo/i, 'Rio Bravo'], [/capit[aâ]nia/i, 'Capitânia'], [/\\bnavi\\b/i, 'Navi'], [/\\b4um\\b/i, '4UM'], [/ip capital/i, 'IP Capital'], [/vitreo/i, 'Vitreo'], [/warren/i, 'Warren'], [/p[aá]tria/i, 'Pátria'], [/pimco/i, 'PIMCO'], [/vanguard/i, 'Vanguard'], [/schroders/i, 'Schroders'], [/j\\.?p\\.? ?morgan/i, 'JP Morgan'], [/franklin/i, 'Franklin Templeton']];   // gestora pelo nome do fundo
 var DG_BLOCOS = [['Renda Fixa', ['pos', 'infl', 'pre']], ['Internacional', ['grv', 'grf']], ['Renda Variável', ['rvb']], ['Fundos Listados', ['listados']], ['Alternativos', ['alt']], ['Multimercado', ['multi']]];
 var DG_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -17758,15 +17758,6 @@ function dgSlides(d) {
   S.push('<section class="slide capa"><div class="faixa"></div><div class="logo logo-capa"><i>FI</i><b>Faragacci Investimentos</b></div><div class="cc"><h1 class="gr">DIAGNÓSTICO<br>DE CARTEIRA</h1><div class="cli">' + esc(d.cliente) + '</div>' +
     '<div class="lin-capa"><span>Patrimônio analisado</span> <b>' + fmtRS(tot) + '</b></div><div class="lin-capa"><span>Perfil de investimento</span> <b>' + esc(d.rotPerfil) + '</b></div>' +
     (d.assessor ? '<div class="lin-capa"><span>Assessor</span> <b>' + esc(d.assessor) + '</b></div>' : '') + '<div class="lin-capa"><span>Posições em</span> <b>' + esc(d.dataExt) + '</b></div></div></section>');
-
-  // instituições parceiras
-  add('INSTITUIÇÕES PARCEIRAS', '',
-    '<p class="grande-dg">Liberdade para investir onde fizer mais sentido, com uma única assessoria acompanhando todo o patrimônio.</p><div class="traco-dg"></div>' +
-    '<p class="p-dg">Mantemos parceria com instituições financeiras sólidas e reconhecidas no mercado.</p>' +
-    '<div class="parc-dg"><div class="rot">MANTEMOS<br>PARCERIA COM</div><div class="grd">' + DG_PARCEIRAS.map(function (n) { return '<span>' + esc(n) + '</span>'; }).join('') + '</div></div>' +
-    '<div class="tres-dg"><div><div class="n">01</div><h4>Liberdade de escolha</h4><p>O patrimônio permanece em seu nome, na instituição de sua preferência. A assessoria orienta as decisões; a custódia continua onde está.</p></div>' +
-    '<div><div class="n">02</div><h4>Visão consolidada</h4><p>Posições em diferentes instituições reunidas em um único diagnóstico, com acompanhamento e revisões periódicas do conjunto.</p></div>' +
-    '<div><div class="n">03</div><h4>Mais alternativas</h4><p>As recomendações consideram as opções disponíveis em cada instituição parceira, e não apenas a prateleira de uma só.</p></div></div>', '-');
 
   // carteira
   var maior = R.linhas.slice().sort(function (a, b) { return Math.abs((b.alvo[pi] || 0) - b.atual) - Math.abs((a.alvo[pi] || 0) - a.atual); })[0];
@@ -18014,15 +18005,18 @@ function dgSlides(d) {
   itensP += '<div class="pr"><span class="num">' + (prio.length + 1) + '</span><div><h3>Acompanhamento periódico</h3><p>Revisões periódicas com relatório de posição e ajuste de rota conforme mudanças de cenário ou de circunstância.</p></div></div>';
   S.push('<section class="slide capa fim" data-sub="PRÓXIMOS PASSOS"><div class="faixa"></div><div class="cc"><div class="marca">P R Ó X I M O S &nbsp; P A S S O S</div><h1 class="gr">PRIORIDADES<br>DE AJUSTE.</h1><div class="prs">' + itensP + '</div>' + (d.assessor ? '<div class="assin"><b>' + esc(d.assessor) + '</b><span>Faragacci Investimentos</span></div>' : '<div class="assin"><span>Faragacci Investimentos</span></div>') +
     '<p class="aviso-dg">Material de caráter meramente informativo, elaborado com base nos arquivos carregados. Não constitui oferta, solicitação ou recomendação de compra ou venda de qualquer ativo.</p></div><div class="rod-fim">Faragacci Investimentos · ' + esc(d.dataCurta) + '</div></section>');
-  // o "A seguir" de cada página descreve a página seguinte, qualquer que seja a composição do relatório
-  var SEGUE = [['INSTITUIÇÕES PARCEIRAS', 'as instituições parceiras e a visão consolidada do patrimônio.'], ['CARTEIRA DE', 'a carteira do cliente: patrimônio, aderência ao perfil e distribuição por classe.'],
+  return S;
+}
+// o "A seguir" de cada página descreve a página seguinte, qualquer que seja a composição do relatório
+function dgEncadear(S) {
+  var SEGUE = [['CARTEIRA DE', 'a carteira do cliente: patrimônio, aderência ao perfil e distribuição por classe.'],
     ['PROJEÇÃO DE PATRIMÔNIO', 'a projeção de patrimônio nos cenários conservador, base e otimista.'], ['ALOCAÇÃO ATUAL', 'a alocação atual e a régua de perfis.'], ['A CARTEIRA COMPARADA', 'a mesma alocação comparada, classe a classe, com cada um dos perfis.'],
     ['FATORES DE RISCO', 'os fatores de risco e os instrumentos por trás dessa alocação.'], ['CUSTÓDIA', 'custódia e estrutura jurídica.'], ['LIQUIDEZ', 'liquidez e tributação da carteira.'], ['RENDA FIXA POR INDEXADOR', 'a renda fixa por indexador e por vencimento.'],
     ['QUALIDADE DE CRÉDITO', 'a qualidade de crédito da renda fixa.'], ['CONCENTRAÇÃO POR EMISSOR', 'a concentração por emissor e a cobertura do FGC.'], ['RISCO DE CRÉDITO', 'o risco de crédito e a cobertura do FGC, emissor a emissor.'],
     ['AÇÕES E ATIVOS LISTADOS', 'as ações e os ativos listados.'], ['PREÇOS ALVO', 'os preços alvo dos ativos de renda variável.'], ['FUNDOS E GESTORES · DETALHE', 'o detalhe dos fundos da carteira.'], ['FUNDOS E GESTORES', 'os fundos, por gestora e concentração.'], ['EXPOSIÇÃO INTERNACIONAL', 'a exposição fora do Brasil.'],
     ['RENTABILIDADE', 'a rentabilidade da carteira no período.'], ['RESUMO DO DIAGNÓSTICO', 'o resumo do diagnóstico, tema a tema.'], ['PRÓXIMOS PASSOS', 'as prioridades de ajuste, em ordem de execução.']];
-  for (var si = 0; si < S.length - 1; si++) {
-    var mm = /data-sub="([^"]*)"/.exec(S[si + 1].slice(0, 240)), nx = mm ? mm[1] : '', fr = '';
+  for (var si = 0; si < S.length; si++) {
+    var mm = /data-sub="([^"]*)"/.exec((S[si + 1] || '').slice(0, 240)), nx = mm ? mm[1] : '', fr = '';
     SEGUE.forEach(function (f) { if (!fr && nx.indexOf(f[0]) === 0) fr = f[1]; });
     S[si] = S[si].replace(/<p class="seguinte">[^<]*<\\/p>/, fr ? '<p class="seguinte">A seguir: ' + fr + '</p>' : '');
   }
@@ -18089,17 +18083,77 @@ function dgCss() {
     '@media print{body{background:#fff}.barra-tela{display:none}.slide{margin:0;box-shadow:none}}'
   ].join('\\n');
 }
+// Escolha das páginas: cada item reúne todas as páginas de um mesmo tema; a seleção fica memorizada neste navegador
+var DG_FORA = 'dg-paginas-fora';
+function dgChave(s) {
+  var m = /data-sub="([^"]*)"/.exec(s.slice(0, 240));
+  if (!m) return 'CAPA';
+  var t = m[1].replace(/ · [0-9]+ DE [0-9]+$/, '');
+  return t.indexOf('CARTEIRA DE ') === 0 ? 'CARTEIRA DE' : t;
+}
+function dgRotulo(k) {
+  if (k === 'CAPA') return 'Capa';
+  if (k === 'CARTEIRA DE') return 'Carteira do cliente: visão geral';
+  if (k === 'PRÓXIMOS PASSOS') return 'Próximos passos (encerramento)';
+  var t = k.charAt(0) + k.slice(1).toLowerCase();
+  return t.split('fgc').join('FGC');
+}
 function abrirDiagnostico() {
   if (!D || !R) { alert('Carregue a carteira antes de gerar o diagnóstico.'); return; }
+  var d = dgDados(), slides = dgSlides(d), grupos = [], porChave = {}, fora = [];
+  slides.forEach(function (s) {
+    var k = dgChave(s);
+    if (!porChave[k]) { porChave[k] = { k: k, n: 0 }; grupos.push(porChave[k]); }
+    porChave[k].n++;
+  });
+  try { fora = JSON.parse(localStorage.getItem(DG_FORA) || '[]'); } catch (e) {}
+  if (!Array.isArray(fora)) fora = [];
+  var antigo = document.getElementById('dg-escolha'); if (antigo) antigo.parentNode.removeChild(antigo);
+  var fundo = document.createElement('div'); fundo.id = 'dg-escolha';
+  fundo.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  fundo.innerHTML = '<div role="dialog" aria-modal="true" aria-label="Páginas do diagnóstico" style="background:#fff;color:#111;border-radius:14px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);">' +
+    '<div style="padding:18px 22px 10px;"><div style="font-size:18px;font-weight:800;">Páginas do diagnóstico</div><div style="font-size:13px;color:#5C5C5C;margin-top:4px;">Marque os temas que farão parte do PDF.</div>' +
+    '<div style="display:flex;gap:8px;margin-top:12px;"><button type="button" class="btn btn-peq" data-dg="todos">Marcar todos</button><button type="button" class="btn btn-peq" data-dg="nenhum">Desmarcar todos</button></div></div>' +
+    '<div style="overflow:auto;min-height:0;padding:4px 22px;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;">' + grupos.map(function (g) {
+      return '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0F0F0;cursor:pointer;font-size:14px;"><input type="checkbox" style="width:17px;height:17px;accent-color:#111;flex:none;" value="' + g.k + '"' + (fora.indexOf(g.k) === -1 ? ' checked' : '') + '><span style="flex:1;">' + dgRotulo(g.k) + '</span><span style="font-size:12px;color:#5C5C5C;white-space:nowrap;">' + g.n + (g.n === 1 ? ' página' : ' páginas') + '</span></label>';
+    }).join('') + '</div>' +
+    '<div style="padding:14px 22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span data-dg="total" style="font-size:13px;color:#5C5C5C;margin-right:auto;"></span><button type="button" class="btn btn-peq" data-dg="cancelar">Cancelar</button><button type="button" class="btn btn-primary" data-dg="gerar">Gerar PDF</button></div></div>';
+  document.body.appendChild(fundo);
+  var caixas = Array.prototype.slice.call(fundo.querySelectorAll('input[type="checkbox"]'));
+  // a posição de cada caixa na lista corresponde à posição do tema em "grupos"
+  function marcados() { var m = {}; caixas.forEach(function (c, i) { if (c.checked) m[grupos[i].k] = true; }); return m; }
+  function escolhidos() { var m = marcados(); return slides.filter(function (s) { return m[dgChave(s)]; }); }
+  function contar() {
+    var n = escolhidos().length;
+    fundo.querySelector('[data-dg="total"]').textContent = n + (n === 1 ? ' página selecionada' : ' páginas selecionadas');
+    fundo.querySelector('button[data-dg="gerar"]').disabled = !n;
+  }
+  function fechar() { if (fundo.parentNode) fundo.parentNode.removeChild(fundo); }
+  fundo.addEventListener('change', contar);
+  fundo.addEventListener('click', function (ev) {
+    var b = ev.target.closest ? ev.target.closest('button[data-dg]') : null, acao = b ? b.getAttribute('data-dg') : '';
+    if (ev.target === fundo || acao === 'cancelar') { fechar(); return; }
+    if (acao === 'todos' || acao === 'nenhum') { caixas.forEach(function (c) { c.checked = acao === 'todos'; }); contar(); return; }
+    if (acao !== 'gerar') return;
+    var lista = escolhidos(); if (!lista.length) return;
+    var m = marcados(), lembrar = fora.filter(function (k) { return !porChave[k]; });   // mantém as escolhas de temas ausentes nesta carteira
+    grupos.forEach(function (g) { if (!m[g.k]) lembrar.push(g.k); });
+    try { localStorage.setItem(DG_FORA, JSON.stringify(lembrar)); } catch (e) {}
+    if (gerarDiagnostico(d, lista)) fechar();
+  });
+  contar();
+}
+function gerarDiagnostico(d, lista) {
   var w = window.open('', '_blank');
-  if (!w) { alert('Permita pop-ups para este site e tente novamente.'); return; }
-  var d = dgDados(), slides = dgSlides(d), n = slides.length;
+  if (!w) { alert('Permita pop-ups para este site e tente novamente.'); return false; }
+  var slides = dgEncadear(lista.slice()), n = slides.length;
   var corpo = slides.map(function (s, i) { return s.split('@@N@@').join(String(i + 1)).split('@@T@@').join(String(n)); }).join('\\n');
   var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diagnóstico — ' + esc(d.cliente) + '</title>' +
     '<style>' + dgCss() + '</' + 'style></head><body>' +
     '<div class="barra-tela"><span>Diagnóstico de carteira · ' + n + ' páginas. Na janela de impressão, escolha <b>Salvar como PDF</b>, orientação <b>paisagem</b>, margens <b>nenhuma</b> e ative <b>Gráficos de segundo plano</b>.</span><button type="button" onclick="window.print()">Imprimir / Salvar como PDF</button></div>' + corpo + '</body></html>';
   w.document.open(); w.document.write(html); w.document.close();
   setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 1500);
+  return true;
 }
 document.getElementById('btn-diagnostico').addEventListener('click', abrirDiagnostico);
 
@@ -20788,6 +20842,11 @@ svg text{font-family:'Inter','Segoe UI',sans-serif;}
       <button type="button" id="b-desce" disabled>Descer</button>
     </span>
   </div>
+  <div class="sep"></div>
+  <div class="grupo">
+    <button type="button" id="b-img" title="Baixa o mapa como está na tela, em imagem PNG">Baixar imagem</button>
+    <button type="button" id="b-pdf" title="Gera o mapa completo em PDF, no padrão dos relatórios">Salvar em PDF</button>
+  </div>
   <span id="status"></span>
 </div>
 <div id="dica">Clique em um tópico para expandir ou recolher os itens vinculados; arraste um tópico para reposicioná-lo (os itens vinculados o acompanham). O tópico clicado fica em destaque; clique no fundo para retirar o destaque. Use o botão (+) de cada tópico para adicionar um subitem e clique duas vezes em um tópico para alterar o texto (Enter confirma; Esc cancela). Em modo de edição, clique em um tópico para selecioná-lo e utilize os botões; as alterações são gravadas automaticamente.</div>
@@ -20799,7 +20858,7 @@ var sb = supabase.createClient('https://segeufywrjmstfmfscdi.supabase.co', 'eyJh
 var DONO = '7319b875-622f-4e7c-91bc-96d22ea484a8';
 var SESSAO_INICIAL = ${JSON.stringify(sessaoAtual)};
 var NS = 'http://www.w3.org/2000/svg';
-var CAIXA = null, ALVO_DEL = null, ULTIMO = { n: null, t: 0 }, LIM = { x0: 0, y0: 0, x1: 0, y1: 0 }, ARR = null, RAIZ = null, SEL = null, EDIT = false, ZOOM = 1, TS = null, UID = '', LARG_TOTAL = 0, ALT_TOTAL = 0;
+var EXPORT = false, CAIXA = null, ALVO_DEL = null, ULTIMO = { n: null, t: 0 }, LIM = { x0: 0, y0: 0, x1: 0, y1: 0 }, ARR = null, RAIZ = null, SEL = null, EDIT = false, ZOOM = 1, TS = null, UID = '', LARG_TOTAL = 0, ALT_TOTAL = 0;
 var LH = 17, PADX = 13, PADY = 10, GAPX = 56, GAPY = 10;
 function larg(d) { return d === 0 ? 264 : (d === 1 ? 304 : 364); }
 function cpl(d) { return d === 0 ? 24 : (d === 1 ? 28 : 38); }
@@ -20867,8 +20926,8 @@ function nos(n, g) {
     ARR = { n: n, x: ev.clientX, y: ev.clientY, mov: false, tem: tem };
   });
   g.appendChild(gr);
-  g.appendChild(botaoMais(n));
-  if (tem && n._d > 0) {
+  if (!EXPORT) g.appendChild(botaoMais(n));
+  if (!EXPORT && tem && n._d > 0) {
     var cx = n._x + n._w, cy = n._y + n._h / 2, cg = criar('g', { 'class': 'no' });
     cg.appendChild(criar('circle', { cx: cx, cy: cy, r: 11, fill: '#111', stroke: '#fff', 'stroke-width': 2 }));
     var tx = criar('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', fill: '#fff', 'font-size': 11, 'font-weight': 700 });
@@ -20927,16 +20986,95 @@ function desenhar() {
   if (!RAIZ) return;
   encerrar(true, true);
   if (ALVO_DEL && ALVO_DEL !== SEL) desarmarExclusao();
-  marcar(RAIZ, 0, null);
-  LIM = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 }; medir(RAIZ); posicionar(RAIZ, 10, 10, 0, 0);
-  LARG_TOTAL = LIM.x1 - LIM.x0 + 40; ALT_TOTAL = LIM.y1 - LIM.y0 + 40;
-  var svg = criar('svg', { width: LARG_TOTAL * ZOOM, height: ALT_TOTAL * ZOOM, viewBox: (LIM.x0 - 20) + ' ' + (LIM.y0 - 20) + ' ' + LARG_TOTAL + ' ' + ALT_TOTAL });
-  var g = criar('g', {}); arestas(RAIZ, g); nos(RAIZ, g); svg.appendChild(g);
+  var svg = montarSvg();
   var c = el('cena'); c.innerHTML = ''; c.appendChild(svg);
   var tem = !!SEL, raiz = SEL === RAIZ;
   el('b-add').disabled = !(EDIT && tem); el('b-ren').disabled = !(EDIT && tem);
   el('b-del').disabled = !(EDIT && tem && !raiz); el('b-sobe').disabled = !(EDIT && tem && !raiz); el('b-desce').disabled = !(EDIT && tem && !raiz);
 }
+function montarSvg() {
+  marcar(RAIZ, 0, null);
+  LIM = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 }; medir(RAIZ); posicionar(RAIZ, 10, 10, 0, 0);
+  LARG_TOTAL = LIM.x1 - LIM.x0 + 40; ALT_TOTAL = LIM.y1 - LIM.y0 + 40;
+  var svg = criar('svg', { width: LARG_TOTAL * ZOOM, height: ALT_TOTAL * ZOOM, viewBox: (LIM.x0 - 20) + ' ' + (LIM.y0 - 20) + ' ' + LARG_TOTAL + ' ' + ALT_TOTAL });
+  var g = criar('g', {}); arestas(RAIZ, g); nos(RAIZ, g); svg.appendChild(g);
+  return svg;
+}
+// ── Exportação: imagem (como está na tela) e PDF no padrão dos relatórios ──
+// Monta o desenho de uma árvore sem botões nem destaque; devolve o SVG e as dimensões
+function svgDe(arvore) {
+  var ant = { r: RAIZ, s: SEL, z: ZOOM };
+  RAIZ = arvore; SEL = null; ZOOM = 1; EXPORT = true;
+  var svg = montarSvg(), r = { svg: svg, w: LARG_TOTAL, h: ALT_TOTAL };
+  RAIZ = ant.r; SEL = ant.s; ZOOM = ant.z; EXPORT = false;
+  svg.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+  return r;
+}
+function baixarImagem() {
+  if (!RAIZ) return;
+  encerrar(true, true);
+  var r = svgDe(RAIZ); desenhar();
+  var esc = Math.min(2.5, 8000 / r.w, 8000 / r.h, Math.sqrt(30000000 / (r.w * r.h)));
+  var img = new Image();
+  img.onload = function () {
+    var cv = document.createElement('canvas'); cv.width = Math.round(r.w * esc); cv.height = Math.round(r.h * esc);
+    var cx = cv.getContext('2d'); cx.fillStyle = '#FFFFFF'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+    cv.toBlob(function (b) {
+      if (!b) { status('Não foi possível gerar a imagem.', true); return; }
+      var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mapa-mental.png';
+      document.body.appendChild(a); a.click(); a.parentNode.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+      status('Imagem gerada: mapa-mental.png.');
+    }, 'image/png');
+  };
+  img.onerror = function () { status('Não foi possível gerar a imagem.', true); };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(r.svg));
+}
+// Cópia da árvore, com todos os itens abertos e no posicionamento automático
+function copiaAberta(n) { var o = { t: n.t }; if (n.f && n.f.length) o.f = n.f.map(copiaAberta); return o; }
+// Um desenho cabe em uma página quando o texto permanece legível após a redução
+function cabe(a) { var r = svgDe(a); return r.w <= 1650 && r.h <= 850; }
+// Divide um ramo em páginas: agrupa os itens enquanto couberem; um item grande demais ganha páginas próprias
+function dividir(no, trilha, out) {
+  var inteiro = copiaAberta(no);
+  if (!no.f || !no.f.length || cabe(inteiro)) { out.push({ trilha: trilha, arvore: inteiro }); return; }
+  var grupo = [];
+  function fechar() { if (grupo.length) { out.push({ trilha: trilha, arvore: { t: no.t, f: grupo } }); grupo = []; } }
+  no.f.forEach(function (filho) {
+    var c = copiaAberta(filho);
+    if (cabe({ t: no.t, f: grupo.concat([c]) })) { grupo.push(c); return; }
+    fechar();
+    if (cabe({ t: no.t, f: [c] })) grupo.push(c); else dividir(filho, trilha.concat([filho.t]), out);
+  });
+  fechar();
+}
+function salvarPdf() {
+  if (!RAIZ) return;
+  encerrar(true, true);
+  var rel = null;
+  try { rel = window.opener && window.opener.CR_REL; } catch (e) {}
+  if (!rel) { status('Mantenha a página principal do site aberta e abra o Mapa Mental novamente para gerar o PDF.', true); return; }
+  var janela = window.open('', '_blank');
+  if (!janela) { status('Permita pop-ups para este site e tente novamente.', true); return; }
+  var paginas = [{ trilha: ['Visão geral'], arvore: { t: RAIZ.t, f: (RAIZ.f || []).map(function (x) { return { t: x.t }; }) } }];
+  (RAIZ.f || []).forEach(function (ramo) { if (ramo.f && ramo.f.length) dividir(ramo, [ramo.t], paginas); });
+  var data = rel.dataHoje(), ctx = { titulo: 'MAPA MENTAL', rodape: RAIZ.t, data: data };
+  var total = {}, atual = {};
+  paginas.forEach(function (p) { var k = p.trilha.join(' › '); total[k] = (total[k] || 0) + 1; });
+  var S = [rel.capa({ titulo: ['MAPA', 'MENTAL'], cliente: RAIZ.t, linhas: [['Emitido em', data]] })];
+  paginas.forEach(function (p) {
+    var k = p.trilha.join(' › '), r = svgDe(p.arvore);
+    atual[k] = (atual[k] || 0) + 1;
+    var esc = Math.min(1.15, 1000 / r.w, 540 / r.h);   // área útil da página, em pixels
+    r.svg.setAttribute('width', Math.floor(r.w * esc)); r.svg.setAttribute('height', Math.floor(r.h * esc));
+    r.svg.setAttribute('style', 'display:block;margin:0 auto;');
+    S.push(rel.slide(ctx, { sub: (k + (total[k] > 1 ? ' · ' + atual[k] + ' DE ' + total[k] : '')).toUpperCase(), corpo: new XMLSerializer().serializeToString(r.svg) }));
+  });
+  desenhar();
+  rel.abrir('Mapa mental', S, janela);
+}
+el('b-img').addEventListener('click', baixarImagem);
+el('b-pdf').addEventListener('click', salvarPdf);
 function percorrer(n, fn) { fn(n); (n.f || []).forEach(function (x) { percorrer(x, fn); }); }
 function limpo(n) { var o = { t: n.t }; if (n.dx) o.dx = Math.round(n.dx); if (n.dy) o.dy = Math.round(n.dy); if (n.f && n.f.length) o.f = n.f.map(limpo); return o; }
 function agendar() {
