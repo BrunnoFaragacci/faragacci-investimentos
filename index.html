@@ -17749,6 +17749,19 @@ function dgGestora(nome) {
   var w = n.replace(/^(fundo de investimento|fundo|fi|fic|fim|fia|firf)\\s+/i, '').split(/\\s+/)[0];
   return w && w.length > 1 ? dgTitulo(w) : 'Não identificada';
 }
+// Renda variável do diagnóstico: cada papel aparece uma única vez, somando as posições mantidas em instituições ou arquivos diferentes
+function dgPorPapel(itens) {
+  var m = {}, ord = [];
+  itens.forEach(function (p) {
+    var tk = tickerDe(p), k = tk || compacto(p.nome), o = m[k];
+    if (!o) { o = m[k] = { nome: tk || p.nome, ticker: tk, tipo: p.tipo, instr: p.instr, saldo: 0, pct: 0, qtd: 0, comQtd: 0, saldoQtd: 0, semQtd: 0 }; ord.push(o); }
+    o.saldo += p.saldo; o.pct += p.pct || 0;
+    if (p.qtd > 0) { o.qtd += p.qtd; o.comQtd++; o.saldoQtd += p.saldo; } else o.semQtd++;
+  });
+  // o preço atual considera somente as posições que informam a quantidade
+  ord.forEach(function (o) { o.precoRef = o.qtd > 0 ? o.saldoQtd / o.qtd : null; });
+  return ord.sort(function (a, b) { return b.saldo - a.saldo; });
+}
 function dgSlides(d) {
   var S = [], base = { cliente: d.cliente, tot: d.tot, perfil: d.rotPerfil, data: d.dataCurta };
   function add(sub, resumo, corpo, seguinte) { S.push(dgSlide({ sub: sub, resumo: resumo, corpo: corpo, seguinte: seguinte, cliente: base.cliente, tot: base.tot, perfil: base.perfil, data: base.data })); }
@@ -17889,7 +17902,7 @@ function dgSlides(d) {
   }
 
   // ações e ativos listados
-  var acoes = R.itens.filter(function (p) { return p.tipo === 'acao'; }), lst = R.itens.filter(function (p) { return p.tipo === 'fii' || p.tipo === 'etf'; });
+  var acoes = dgPorPapel(R.itens.filter(function (p) { return p.tipo === 'acao'; })), lst = dgPorPapel(R.itens.filter(function (p) { return p.tipo === 'fii' || p.tipo === 'etf'; }));
   if (acoes.length || lst.length) {
     var vA = soma(acoes, function (p) { return p.saldo; }), vL = soma(lst, function (p) { return p.saldo; });
     // preço (R$) com o potencial de valorização (%) logo abaixo, em relação ao preço atual do ativo
@@ -17917,10 +17930,10 @@ function dgSlides(d) {
       var POR_PAG = 8, npag = Math.ceil(linhasAlvo.length / POR_PAG);
       for (var pgA = 0; pgA < npag; pgA++) {
         var fatia = linhasAlvo.slice(pgA * POR_PAG, (pgA + 1) * POR_PAG);
-        var corpoA = '<table class="tab-dg"><thead><tr><th class="e">Ativo</th><th class="e">Empresa</th><th>Posição</th><th>% carteira</th><th>Preço atual</th><th>Preço teto</th><th>Preço alvo XP</th></tr></thead><tbody>' + fatia.map(function (p) {
+        var corpoA = '<table class="tab-dg"><thead><tr><th class="e">Ativo</th><th class="e">Empresa</th><th>Quantidade</th><th>Posição</th><th>% carteira</th><th>Preço atual</th><th>Preço teto</th><th>Preço alvo XP</th></tr></thead><tbody>' + fatia.map(function (p) {
           var tk = tickerDe(p), x = XPALVO[tk], teto = tetoDe(tk), pr = precoDe(p);
-          return '<tr><td class="e">' + esc(p.nome) + '</td><td class="e">' + esc(nomeEmpresa(p) || '—') + '</td><td>' + fmtRS(p.saldo) + '</td><td>' + dgPct(p.pct, 2) + '</td><td>' + (pr ? fmtBRL(pr) : '—') + '</td><td>' + celPreco(teto, pr) + '</td><td>' + (x ? celPreco(x.alvo, pr) : '—') + '</td></tr>';
-        }).join('') + '</tbody></table>' + (pgA === npag - 1 ? '<p class="nt">Ativos sem preço alvo não possuem cobertura na carteira recomendada da XP. O percentual indicado abaixo de cada preço é o potencial de valorização em relação ao preço atual do ativo.</p>' : '');
+          return '<tr><td class="e">' + esc(p.nome) + '</td><td class="e">' + esc(nomeEmpresa(p) || '—') + '</td><td>' + (p.qtd > 0 ? fmtQtd(p.qtd) + (p.semQtd ? '*' : '') : '—') + '</td><td>' + fmtRS(p.saldo) + '</td><td>' + dgPct(p.pct, 2) + '</td><td>' + (pr ? fmtBRL(pr) : '—') + '</td><td>' + celPreco(teto, pr) + '</td><td>' + (x ? celPreco(x.alvo, pr) : '—') + '</td></tr>';
+        }).join('') + '</tbody></table>' + (fatia.some(function (p) { return p.qtd > 0 && p.semQtd; }) ? '<p class="nt">* Quantidade parcial: parte das posições deste papel não informa a quantidade. O valor da posição considera todas.</p>' : '') + (pgA === npag - 1 ? '<p class="nt">Ativos sem preço alvo não possuem cobertura na carteira recomendada da XP. O percentual indicado abaixo de cada preço é o potencial de valorização em relação ao preço atual do ativo.</p>' : '');
         add('PREÇOS ALVO DA RENDA VARIÁVEL' + (npag > 1 ? ' · ' + (pgA + 1) + ' DE ' + npag : ''), 'Preço alvo da carteira recomendada da XP' + (XPALVO_EM ? ', atualizada em ' + fmtDataISO(XPALVO_EM) : '') + ', e preço teto definido pelo assessor para os ativos da carteira.', corpoA, 'a exposição fora do Brasil.');
       }
     }
@@ -19270,7 +19283,7 @@ function tickerDe(p) {
   var w = String(p.nome || '').toUpperCase().split(/\\s+/)[0];
   return RE_TICKER_BR.test(w) ? w : '';
 }
-function precoDe(p) { return p.qtd > 0 ? p.saldo / p.qtd : null; }
+function precoDe(p) { if (p.precoRef !== undefined) return p.precoRef; return p.qtd > 0 ? p.saldo / p.qtd : null; }
 // nome da empresa (cobertura da XP ou carteira recomendada), exibido no lugar do código nas tabelas de renda variável
 function nomeEmpresa(p) {
   var tk = tickerDe(p);
