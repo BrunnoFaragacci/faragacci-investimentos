@@ -18945,6 +18945,58 @@ function htmlAporte(pi) {
   var res = c.n ? '' : '<p class="resumo">Nenhuma classe está abaixo do alvo do ' + esc(perfil) + '; não há defasagem para direcionar o aporte.</p>';
   return h + res + t;
 }
+// ── Realocação sem novo aporte: o excedente das classes acima do alvo é direcionado às classes abaixo do alvo; o patrimônio total não muda ──
+function chaveAloc(p) { return p.chave === 'caixa' ? 'pos' : p.chave; }
+function calcRealocacao(pi) {
+  var T = R.total;
+  var linhas = R.linhas.map(function (l) {
+    var alvo = l.alvo[pi] || 0, dif = alvo / 100 * T - l.valor;
+    return { nome: l.nome, chave: l.chave, valor: l.valor, atual: l.atual, alvo: alvo, def: Math.max(0, dif), resgate: Math.max(0, -dif), aplicar: 0 };
+  });
+  var sd = soma(linhas, function (x) { return x.def; }), sr = soma(linhas, function (x) { return x.resgate; });
+  var vol = sd > 0.005 ? sr : 0;
+  linhas.forEach(function (x) {
+    if (!(vol > 0)) x.resgate = 0;
+    x.aplicar = sd > 0 ? vol * x.def / sd : 0;
+    x.aposPct = T > 0 ? (x.valor + x.aplicar - x.resgate) / T * 100 : 0;
+  });
+  return { volume: vol, linhas: linhas };
+}
+function htmlRealocacao(pi) {
+  var perfil = R.matriz.perfis[pi].nome, c = calcRealocacao(pi), abertas = ST.realocAbertas || (ST.realocAbertas = {}), cid = clienteInteresse();
+  if (cid && logado && INT_ID !== cid && !INT_CARREGANDO) carregarInteresses();
+  if (!(c.volume > 0.005)) return '<p class="resumo">A carteira já está alinhada ao ' + esc(perfil) + '; não há valores a realocar.</p>';
+  var nRes = c.linhas.filter(function (x) { return x.resgate > 0.005; }).length, nApl = c.linhas.filter(function (x) { return x.aplicar > 0.005; }).length;
+  var res = '<p class="resumo">Para alinhar a carteira ao <b>' + esc(perfil) + '</b> sem dinheiro novo, realoque <b>' + fmtBRL(c.volume) + '</b> (' + fmtP(c.volume / R.total * 100, 1) + ' do patrimônio): resgate de ' + nRes + ' classe(s) e aplicação em ' + nApl + ' classe(s). O patrimônio total permanece em ' + fmtBRL(R.total) + '.</p>';
+  var ord = c.linhas.slice().sort(function (a, b) { return b.aplicar - a.aplicar || b.resgate - a.resgate || b.valor - a.valor; });
+  var t = '<div class="tabela-wrap"><table class="tb"><thead><tr><th></th><th class="e">Classe</th><th>Atual (R$)</th><th>Atual (%)</th><th>Alvo (%)</th><th>% na classe</th><th>Aplicar (R$)</th><th>Resgatar (R$)</th><th>% da realocação</th><th>Após a realocação (%)</th><th>Diferença para o alvo (p.p.)</th></tr></thead><tbody>';
+  ord.forEach(function (x, i) {
+    var dif = x.aposPct - x.alvo, vende = x.resgate > 0.005, compra = x.aplicar > 0.005, aberta = !!abertas[x.nome];
+    var itens = vende ? R.itens.filter(function (p) { return chaveAloc(p) === x.chave && p.saldo > 0; }) : interessesDaClasse(x.nome);
+    var dica = vende ? itens.length + ' posição(ões) da carteira nesta classe' : itens.length + ' ativo(s) de interesse nesta classe';
+    var mov = vende ? x.resgate : x.aplicar;
+    t += '<tr class="' + (i % 2 ? 'zebra' : '') + '"><td class="col-acoes" style="text-align:left;width:42px;"><button type="button" class="btn btn-peq" data-realoc-toggle="' + esc(x.nome) + '" title="' + dica + '">' + (aberta ? '−' : '+') + '</button></td><td class="e">' + esc(x.nome) + '</td><td>' + fmtBRL(x.valor) + '</td><td>' + fmtP(x.atual) + '</td><td>' + fmtP(x.alvo) + '</td><td>' + (itens.length ? '100,00%' : '—') + '</td><td>' + (compra ? '<b class="pos">' + fmtBRL(x.aplicar) + '</b>' : '—') + '</td><td>' + (vende ? '<b class="neg">' + fmtBRL(x.resgate) + '</b>' : '—') + '</td><td>' + (compra || vende ? fmtP(mov / c.volume * 100, 1) : '—') + '</td><td>' + fmtP(x.aposPct) + '</td><td class="' + clsv(dif) + '">' + fmtPs(dif, 2) + '</td></tr>';
+    if (!aberta) return;
+    if (!itens.length) { t += '<tr class="sub-aporte"><td></td><td class="e" colspan="10"><small>' + (vende ? 'Não há posições detalhadas nesta classe.' : 'Nenhum ativo de interesse cadastrado nesta classe. Adicione em "Ativos de interesse".') + '</small></td></tr>'; return; }
+    if (vende) {
+      var base = soma(itens, function (p) { return p.saldo; });
+      itens.slice().sort(function (a, b) { return b.saldo - a.saldo; }).forEach(function (p) {
+        var parte = p.saldo / base, val = x.resgate * parte;
+        t += '<tr class="sub-aporte"><td></td><td class="e">↳ <b>' + esc(p.nome) + '</b><br><small>' + esc((p.inst ? p.inst + ' · ' : '') + (rotLiq[p.liq] || '')) + '</small></td><td>' + fmtBRL(p.saldo) + '</td><td></td><td></td><td>' + fmtP(parte * 100) + '</td><td></td><td><b>' + fmtBRL(val) + '</b></td><td>' + fmtP(val / c.volume * 100, 1) + '</td><td></td><td></td></tr>';
+      });
+      return;
+    }
+    var pcts = pctsClasse(itens);
+    itens.forEach(function (a) {
+      var val = x.aplicar * pcts[a.id] / 100, cot = interesseListado(a) ? INT_COT[simboloYahoo(a.ticker)] : null, cotas = cot && typeof cot.preco === 'number' && cot.moeda !== 'USD' && val > 0 ? Math.floor(val / cot.preco) : null;
+      t += '<tr class="sub-aporte"><td></td><td class="e">↳ <b>' + esc(a.ticker) + '</b>' + (cot && cot.nome ? ' <small>' + esc(cot.nome) + '</small>' : '') + (cotas !== null ? '<br><small>≈ ' + fmtQtd(cotas) + ' cota(s) a ' + fmtBRL(cot.preco) + '</small>' : '') + '</td><td></td><td></td><td></td><td>' +
+        (itens.length > 1 ? '<input type="text" class="in-crit" style="max-width:84px;text-align:right;" data-pct-int="' + esc(a.id) + '" value="' + numTxt(pcts[a.id], 2) + '" title="Percentual sugerido deste ativo dentro da classe; os demais são ajustados proporcionalmente">%' : '100,00%') + '</td><td>' + (compra ? '<b>' + fmtBRL(val) + '</b>' : '—') + '</td><td></td><td>' + (val > 0.005 ? fmtP(val / c.volume * 100, 1) : '—') + '</td><td></td><td></td></tr>';
+    });
+  });
+  var totApl = soma(c.linhas, function (x) { return x.aplicar; }), totRes = soma(c.linhas, function (x) { return x.resgate; });
+  t += '<tr class="total"><td></td><td class="e">Total</td><td>' + fmtBRL(R.total) + '</td><td>' + fmtP(soma(c.linhas, function (x) { return x.atual; })) + '</td><td>' + fmtP(soma(c.linhas, function (x) { return x.alvo; })) + '</td><td></td><td>' + fmtBRL(totApl) + '</td><td>' + fmtBRL(totRes) + '</td><td></td><td>' + fmtP(soma(c.linhas, function (x) { return x.aposPct; })) + '</td><td></td></tr></tbody></table></div>';
+  return res + t + '<p class="nota">O resgate sugerido é distribuído proporcionalmente ao saldo de cada posição da classe. Antes de executar, verifique liquidez, vencimentos, carência, tributação e custos de saída.</p>';
+}
 function interessesDaClasse(nome) { return (INT_ID === clienteInteresse() ? INTERESSES : []).filter(function (x) { return x.classe === nome; }); }
 // Alterar o percentual de um ativo: os demais da classe são ajustados proporcionalmente para que a soma permaneça em 100%
 document.addEventListener('change', function (ev) {
@@ -19123,12 +19175,13 @@ function excluirModeloInteresse() {
   });
 }
 function aplicarAcaoInteresse(t) {
-  var el = t && t.closest ? t.closest('[data-int-add],[data-int-rm],[data-aporte-toggle],[data-mod-aplicar],[data-mod-salvar],[data-mod-excluir]') : null;
+  var el = t && t.closest ? t.closest('[data-int-add],[data-int-rm],[data-aporte-toggle],[data-realoc-toggle],[data-mod-aplicar],[data-mod-salvar],[data-mod-excluir]') : null;
   if (!el) return false;
   if (el.hasAttribute('data-mod-aplicar')) { aplicarModeloInteresse(); return true; }
   if (el.hasAttribute('data-mod-salvar')) { salvarModeloInteresse(); return true; }
   if (el.hasAttribute('data-mod-excluir')) { excluirModeloInteresse(); return true; }
   if (el.hasAttribute('data-aporte-toggle')) { var ab = ST.aporteAbertas || (ST.aporteAbertas = {}), k = el.getAttribute('data-aporte-toggle'); ab[k] = !ab[k]; if (D && R) render(); return true; }
+  if (el.hasAttribute('data-realoc-toggle')) { var ra = ST.realocAbertas || (ST.realocAbertas = {}), rk = el.getAttribute('data-realoc-toggle'); ra[rk] = !ra[rk]; if (D && R) render(); return true; }
   if (el.hasAttribute('data-int-add')) adicionarInteresse(); else removerInteresse(el.getAttribute('data-int-rm'));
   return true;
 }
@@ -19410,6 +19463,7 @@ PAGINAS.alocacao = function () {
   h += tile('t7', 'Atual x alvo do ' + esc(perfis[pi].nome), cmp);
   h += tile('t12', 'Carteira comparada ao ' + esc(perfis[pi].nome), t);
   h += tile('t12', 'Novo aporte', htmlAporte(pi), 'distribui o valor nas classes abaixo do alvo do perfil');
+  h += tile('t12', 'Realocação sem novo aporte', htmlRealocacao(pi), 'resgata das classes acima do alvo e aplica nas classes abaixo do alvo');
   h += tile('t12', 'Ativos de interesse', htmlInteresses(), 'o assessor e o cliente podem adicionar ativos');
   h += tile('t6', 'Por estratégia', donutDim('est', 'total'), 'clique para filtrar');
   h += tile('t6', 'Por instrumento', barrasDim('instr'), 'clique para filtrar');
