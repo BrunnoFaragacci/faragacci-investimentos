@@ -17762,6 +17762,44 @@ function dgPorPapel(itens) {
   ord.forEach(function (o) { o.precoRef = o.qtd > 0 ? o.saldoQtd / o.qtd : null; });
   return ord.sort(function (a, b) { return b.saldo - a.saldo; });
 }
+// Rentabilidade dos fundos em 12 e 24 meses (cotas informadas à CVM) e o CDI das mesmas janelas: tabela fundos_rentabilidade
+var RENT_FUNDOS = {};
+function carregarRentFundos() {
+  if (!sb) return;
+  sb.from('fundos_rentabilidade').select('nome,data_ref,r12,r24,cdi12,cdi24').range(0, 1999).then(function (r) {
+    if (r.error || !r.data) return;
+    var m = {};
+    r.data.forEach(function (x) { m[compacto(x.nome)] = x; });
+    RENT_FUNDOS = m;
+  });
+}
+function dgTabelaFundos(arr, tot) {
+  var num = function (v) { return v === null || v === undefined || v === '' || isNaN(Number(v)) ? null : Number(v); };
+  var cdiArq = (D && D.bench && D.bench.cdi) || [];
+  // fonte oficial (CVM); na falta dela, os percentuais informados no próprio arquivo da carteira
+  var linhas = arr.map(function (p) {
+    var o = RENT_FUNDOS[compacto(p.nome)];
+    if (o) return { p: p, r12: num(o.r12), r24: num(o.r24), c12: num(o.cdi12), c24: num(o.cdi24), ref: o.data_ref, arq: false };
+    var a12 = num(p.m12), a24 = num(p.m24);
+    return { p: p, r12: a12, r24: a24, c12: num(cdiArq[2]), c24: num(cdiArq[3]), ref: '', arq: a12 !== null || a24 !== null };
+  });
+  var base = linhas.filter(function (l) { return l.ref; })[0] || linhas.filter(function (l) { return l.arq; })[0] || null;
+  function cel(r, c, marca) {
+    if (r === null) return '<td>—</td><td>—</td>';
+    return '<td' + (r < 0 ? ' class="neg-dg"' : '') + '>' + fmtP(r, 2) + (marca ? '†' : '') + '</td><td>' + (c > 0 ? fmtP(r / c * 100, 0) : '—') + '</td>';
+  }
+  var h = '<table class="tab-dg"><thead><tr><th class="e">Fundo</th><th class="e">Gestora</th><th class="e">Classe</th><th>Posição</th><th>% carteira</th><th>12 meses</th><th>% CDI</th><th>24 meses</th><th>% CDI</th></tr></thead><tbody>';
+  if (base) h += '<tr class="sub"><td class="e" colspan="5"><b>CDI no período</b></td><td><b>' + (base.c12 === null ? '—' : fmtP(base.c12, 2)) + '</b></td><td>' + (base.c12 === null ? '—' : '100%') + '</td><td><b>' + (base.c24 === null ? '—' : fmtP(base.c24, 2)) + '</b></td><td>' + (base.c24 === null ? '—' : '100%') + '</td></tr>';
+  h += linhas.map(function (l) {
+    var p = l.p;
+    return '<tr><td class="e">' + esc(p.nome) + '</td><td class="e">' + esc(dgGestora(p.nome)) + '</td><td class="e">' + esc(ROTULOS_CLASSE[p.chave] || p.estrategia || '—') + '</td><td>' + fmtRS(p.saldo) + '</td><td>' + dgPct(p.pct, 2) + '</td>' + cel(l.r12, l.c12, l.arq) + cel(l.r24, l.c24, l.arq) + '</tr>';
+  }).join('') + '</tbody></table>';
+  var comRef = linhas.filter(function (l) { return l.ref; })[0], notas = [];
+  if (comRef) notas.push('Rentabilidade calculada pelas cotas informadas à CVM, em janelas encerradas em ' + fmtDataISO(comRef.ref) + '; não considera impostos nem rendimentos distribuídos.');
+  if (linhas.some(function (l) { return l.arq; })) notas.push('† Percentual informado no arquivo da carteira, na data-base do próprio arquivo.');
+  if (linhas.some(function (l) { return l.r12 === null || l.r24 === null; })) notas.push('— indica período sem histórico disponível. Rentabilidade passada não representa garantia de resultados futuros.');
+  return h + (notas.length ? '<p class="nt">' + notas.join(' ') + '</p>' : '');
+}
 function dgSlides(d) {
   var S = [], base = { cliente: d.cliente, tot: d.tot, perfil: d.rotPerfil, data: d.dataCurta };
   function add(sub, resumo, corpo, seguinte) { S.push(dgSlide({ sub: sub, resumo: resumo, corpo: corpo, seguinte: seguinte, cliente: base.cliente, tot: base.tot, perfil: base.perfil, data: base.data })); }
@@ -17947,18 +17985,14 @@ function dgSlides(d) {
     var porN = dgAgrupar(fundos, function (p) { return ROTULOS_CLASSE[p.chave] || p.estrategia || 'Outros'; });
     var fOrd = fundos.slice().sort(function (a, b) { return b.saldo - a.saldo; }), multiL = R.linhas.filter(function (l) { return l.chave === 'multi'; })[0];
     var notaF = 'Gestora identificada pelo nome do fundo; confirme na lâmina. As taxas de administração e de performance não constam dos arquivos carregados.';
-    var tabF = function (arr) {
-      return '<table class="tab-dg"><thead><tr><th class="e">Fundo</th><th class="e">Gestora</th><th class="e">Classe</th><th>Posição</th><th>% carteira</th></tr></thead><tbody>' + arr.map(function (p) {
-        return '<tr><td class="e">' + esc(p.nome) + '</td><td class="e">' + esc(dgGestora(p.nome)) + '</td><td class="e">' + esc(ROTULOS_CLASSE[p.chave] || p.estrategia || '—') + '</td><td>' + fmtRS(p.saldo) + '</td><td>' + dgPct(p.pct, 2) + '</td></tr>';
-      }).join('') + '</tbody></table>';
-    };
+    var tabF = function (arr) { return dgTabelaFundos(arr, tot); };
     add('FUNDOS E GESTORES', dgPct(pF, 1) + ' do patrimônio está em fundos, distribuído em ' + porG.length + (porG.length === 1 ? ' gestora' : ' gestoras') + '. A maior é ' + esc(porG[0].r) + ', com ' + dgPct(tot > 0 ? porG[0].v / tot * 100 : 0, 1) + ' da carteira.',
       dgKpis([{ r: 'Em fundos', v: dgPct(pF, 1), s: fmtRS(totF) + ' · ' + fundos.length + (fundos.length === 1 ? ' fundo' : ' fundos') }, { r: 'Gestoras', v: String(porG.length), s: 'maior: ' + porG[0].r }, { r: 'Maior fundo', v: dgPct(tot > 0 ? fOrd[0].saldo / tot * 100 : 0, 1), s: String(fOrd[0].nome).slice(0, 34) }].concat(multiL ? [{ r: 'Multimercados', v: dgPct(multiL.atual, 1), s: 'alvo de ' + dgPct(multiL.alvo[pi] || 0, 1) + ' no ' + d.perfil }] : [])) +
       '<div class="duas"><div>' + dgSecao('Por gestora') + dgBarras(porG, tot, 6) + '</div><div>' + dgSecao('Por natureza do fundo') + dgBarras(porN, tot, 6) + '</div></div>' +
       (fOrd.length <= 4 ? tabF(fOrd) : '') + '<p class="nt">' + notaF + '</p>', '-');
     if (fOrd.length > 4) {
-      var nPgF = Math.ceil(fOrd.length / 12);
-      for (var pgF = 0; pgF < nPgF; pgF++) add('FUNDOS E GESTORES · DETALHE' + (nPgF > 1 ? ' · ' + (pgF + 1) + ' DE ' + nPgF : ''), 'Fundos da carteira, com a gestora identificada pelo nome do fundo.', tabF(fOrd.slice(pgF * 12, (pgF + 1) * 12)) + (pgF === nPgF - 1 ? '<p class="nt">' + notaF + '</p>' : ''), '-');
+      var nPgF = Math.ceil(fOrd.length / 10);
+      for (var pgF = 0; pgF < nPgF; pgF++) add('FUNDOS E GESTORES · DETALHE' + (nPgF > 1 ? ' · ' + (pgF + 1) + ' DE ' + nPgF : ''), 'Fundos da carteira, com a gestora identificada pelo nome do fundo.', tabF(fOrd.slice(pgF * 10, (pgF + 1) * 10)) + (pgF === nPgF - 1 ? '<p class="nt">' + notaF + '</p>' : ''), '-');
     }
   }
 
@@ -20040,7 +20074,8 @@ document.getElementById('btn-fechar-crit').addEventListener('click', function ()
 iniciarCriterios();
 carregarAlvosXP();
 carregarTetosRecom(true);
-window.addEventListener('focus', function () { carregarAlvosXP(); carregarTetosRecom(true); });
+carregarRentFundos();
+window.addEventListener('focus', function () { carregarAlvosXP(); carregarTetosRecom(true); carregarRentFundos(); });
 document.getElementById('btn-excel').addEventListener('click', function () {
   if (!D) return;
   var wb = XLSX.utils.book_new();
