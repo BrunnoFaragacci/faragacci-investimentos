@@ -17977,6 +17977,16 @@ function dgSlides(d) {
     }
   }
 
+  // ações por setor
+  var stBR = R.itens.filter(ehAcaoBrasil), stEx = R.itens.filter(ehAcaoExterior);
+  if (stBR.length || stEx.length) {
+    var tBR = soma(stBR, function (p) { return p.saldo; }), tEx = soma(stEx, function (p) { return p.saldo; }), gBR = agruparPor(stBR, setorAtivo), gEx = agruparPor(stEx, setorAtivo);
+    var maior = function (g, t) { return g.length ? esc(g[0].r) + ' (' + dgPct(t > 0 ? g[0].v / t * 100 : 0, 1) + ')' : ''; };
+    var col = function (titulo, g, t) { return '<div>' + dgSecao(titulo, fmtRS(t)) + (g.length ? dgBarras(g, t, 9) : '<p class="vazio-dg">Nenhuma posição.</p>') + '</div>'; };
+    add('AÇÕES POR SETOR', (stBR.length ? 'Nas ações brasileiras, o maior setor é ' + maior(gBR, tBR) + '. ' : '') + (stEx.length ? 'Nas ações e REITs no exterior, o maior é ' + maior(gEx, tEx) + '.' : ''),
+      '<div class="duas">' + col('Ações Brasil', gBR, tBR) + col('Ações e REITs no exterior', gEx, tEx) + '</div><p class="nt">Percentuais calculados sobre o total de cada grupo. Fundos, ETFs e fundos imobiliários não são distribuídos por setor.</p>', '-');
+  }
+
   // fundos e gestores
   var fundos = R.itens.filter(function (p) { var ro = rotuloInstrumento(p); return ro === 'Fundo de investimento' || (/^Fundo/i.test(ro) && !/imobili|listad/i.test(ro)); }), porG = [];
   if (fundos.length) {
@@ -18002,6 +18012,31 @@ function dgSlides(d) {
   var pOff = tot > 0 ? d.off / tot * 100 : 0;
   add('EXPOSIÇÃO INTERNACIONAL', dgPct(pOff, 1) + ' do patrimônio está fora do Brasil, contra alvo de ' + dgPct(altoInt, 1) + ' no ' + esc(d.perfil) + (pOff > altoInt ? ' — ' + esc(fmtRS((pOff - altoInt) / 100 * tot)) + ' acima do alvo' : '') + (intl.length ? ', distribuídos em ' + intl.length + ' posições.' : '.'),
     '<div class="duas"><div>' + dgSecao('Onshore x offshore') + dgDonut([{ r: 'Onshore', v: Math.max(0, tot - d.off) }, { r: 'Offshore', v: d.off }].filter(function (x) { return x.v > 0; }), 'total', fmtCompacto(tot)) + '</div><div>' + dgSecao('Global por veículo') + (intl.length ? dgBarras(dgAgrupar(intl, function (p) { return p.chave === 'grv' ? 'Global renda variável' : 'Global renda fixa'; }).concat(dgAgrupar(intl, function (p) { return p.nome; }).slice(0, 6).map(function (x) { return { r: '· ' + x.r, v: x.v }; })), tot, 10) : '<p class="vazio-dg">Sem exposição internacional.</p>') + '</div></div>', 'rentabilidade e pontos de atenção.');
+
+  var listaInt = R.itens.filter(ehInternacional);
+  if (listaInt.length) {
+    var mI = {}, ativosInt = [];
+    listaInt.forEach(function (p) {
+      var k = codigoDe(p) || compacto(p.nome), o = mI[k];
+      if (!o) { o = mI[k] = { nome: p.nome, tipo: tipoInternacional(p), insts: [], saldo: 0, pct: 0, qtd: 0, temQtd: 0, semQtd: 0, usd: 0, temUsd: 0, semUsd: 0 }; ativosInt.push(o); }
+      if (String(p.nome).length > o.nome.length) o.nome = p.nome;
+      o.saldo += p.saldo; o.pct += p.pct || 0;
+      if (p.inst && o.insts.indexOf(p.inst) === -1) o.insts.push(p.inst);
+      if (p.qtd > 0) { o.qtd += p.qtd; o.temQtd++; } else o.semQtd++;
+      var u = valorUS(p); if (u === null) o.semUsd++; else { o.usd += u; o.temUsd++; }
+    });
+    ativosInt.sort(function (a, b) { return b.saldo - a.saldo; });
+    var POR_INT = 11, nInt = Math.ceil(ativosInt.length / POR_INT), vInt = soma(listaInt, function (p) { return p.saldo; }), uInt = soma(listaInt, function (p) { return valorUS(p) || 0; });
+    for (var pI = 0; pI < nInt; pI++) {
+      var parte = ativosInt.slice(pI * POR_INT, (pI + 1) * POR_INT), fim = pI === nInt - 1;
+      add('ATIVOS INTERNACIONAIS' + (nInt > 1 ? ' · ' + (pI + 1) + ' DE ' + nInt : ''), ativosInt.length + (ativosInt.length === 1 ? ' ativo internacional' : ' ativos internacionais') + ', somando ' + esc(fmtRS(vInt)) + ' (' + dgPct(tot > 0 ? vInt / tot * 100 : 0, 1) + ' do patrimônio).',
+        '<table class="tab-dg"><thead><tr><th class="e">Ativo</th><th class="e">Tipo</th><th class="e">Instituição</th><th>Quantidade</th><th>Posição (US$)</th><th>Posição (R$)</th><th>% carteira</th></tr></thead><tbody>' + parte.map(function (o) {
+          return '<tr><td class="e">' + esc(o.nome) + '</td><td class="e">' + esc(o.tipo) + '</td><td class="e">' + esc(o.insts.join(', ')) + '</td><td>' + (o.temQtd ? fmtQtd(o.qtd) + (o.semQtd ? '*' : '') : '—') + '</td><td>' + (o.temUsd ? fmtUS(o.usd) + (o.semUsd ? '*' : '') : '—') + '</td><td>' + fmtRS(o.saldo) + '</td><td>' + dgPct(o.pct, 2) + '</td></tr>';
+        }).join('') + (fim ? '<tr class="sub"><td class="e" colspan="4"><b>Total</b></td><td><b>' + (uInt > 0 ? fmtUS(uInt) : '—') + '</b></td><td><b>' + fmtRS(vInt) + '</b></td><td><b>' + dgPct(tot > 0 ? vInt / tot * 100 : 0, 2) + '</b></td></tr>' : '') + '</tbody></table>' +
+        (parte.some(function (o) { return (o.temQtd && o.semQtd) || (o.temUsd && o.semUsd); }) ? '<p class="nt">* Valor parcial: parte das posições não informa este dado.</p>' : '') +
+        (fim ? '<p class="nt">A coluna em dólar considera as posições informadas em US$; as demais são mantidas em reais.</p>' : ''), '-');
+    }
+  }
 
   // rentabilidade
   if (!D.semRent && D.evol && D.evol.length) {
@@ -18060,7 +18095,7 @@ function dgEncadear(S) {
     ['PROJEÇÃO DE PATRIMÔNIO', 'a projeção de patrimônio nos cenários conservador, base e otimista.'], ['ALOCAÇÃO ATUAL', 'a alocação atual e a régua de perfis.'], ['A CARTEIRA COMPARADA', 'a mesma alocação comparada, classe a classe, com cada um dos perfis.'],
     ['FATORES DE RISCO', 'os fatores de risco e os instrumentos por trás dessa alocação.'], ['CUSTÓDIA', 'custódia e estrutura jurídica.'], ['LIQUIDEZ', 'liquidez e tributação da carteira.'], ['RENDA FIXA POR INDEXADOR', 'a renda fixa por indexador e por vencimento.'],
     ['QUALIDADE DE CRÉDITO', 'a qualidade de crédito da renda fixa.'], ['CONCENTRAÇÃO POR EMISSOR', 'a concentração por emissor e a cobertura do FGC.'], ['RISCO DE CRÉDITO', 'o risco de crédito e a cobertura do FGC, emissor a emissor.'],
-    ['AÇÕES E ATIVOS LISTADOS', 'as ações e os ativos listados.'], ['PREÇOS ALVO', 'os preços alvo dos ativos de renda variável.'], ['FUNDOS E GESTORES · DETALHE', 'o detalhe dos fundos da carteira.'], ['FUNDOS E GESTORES', 'os fundos, por gestora e concentração.'], ['EXPOSIÇÃO INTERNACIONAL', 'a exposição fora do Brasil.'],
+    ['AÇÕES E ATIVOS LISTADOS', 'as ações e os ativos listados.'], ['PREÇOS ALVO', 'os preços alvo dos ativos de renda variável.'], ['FUNDOS E GESTORES · DETALHE', 'o detalhe dos fundos da carteira.'], ['FUNDOS E GESTORES', 'os fundos, por gestora e concentração.'], ['AÇÕES POR SETOR', 'a diversificação das ações por setor.'], ['ATIVOS INTERNACIONAIS', 'os ativos internacionais, um a um.'], ['EXPOSIÇÃO INTERNACIONAL', 'a exposição fora do Brasil.'],
     ['RENTABILIDADE', 'a rentabilidade da carteira no período.'], ['RESUMO DO DIAGNÓSTICO', 'o resumo do diagnóstico, tema a tema.'], ['PRÓXIMOS PASSOS', 'as prioridades de ajuste, em ordem de execução.']];
   for (var si = 0; si < S.length; si++) {
     var mm = /data-sub="([^"]*)"/.exec((S[si + 1] || '').slice(0, 240)), nx = mm ? mm[1] : '', fr = '';
@@ -18468,7 +18503,7 @@ if (window.setInterval) window.setInterval(function () { if (D && R && D.cotacoe
 // ── Estado, filtros cruzados e dimensões ──
 // Cada dimensão pode ter vários valores selecionados (união dentro da dimensão, interseção entre dimensões).
 // Os gráficos de uma dimensão mostram o cruzamento das DEMAIS dimensões e destacam os valores selecionados.
-var ABAS = [['geral', 'Visão geral'], ['alertas', 'Pontos de atenção'], ['rentab', 'Rentabilidade'], ['backtest', 'Backtest'], ['alocacao', 'Alocação e perfis'], ['inst', 'Instituições'], ['posicoes', 'Posições'], ['rv', 'Renda variável'], ['rf', 'Renda fixa'], ['credito', 'Análise de crédito']];
+var ABAS = [['geral', 'Visão geral'], ['alertas', 'Pontos de atenção'], ['rentab', 'Rentabilidade'], ['backtest', 'Backtest'], ['alocacao', 'Alocação e perfis'], ['inst', 'Instituições'], ['posicoes', 'Posições'], ['rv', 'Renda variável'], ['intl', 'Internacional'], ['rf', 'Renda fixa'], ['credito', 'Análise de crédito']];
 var ABAS_DEF = ABAS.slice();
 function salvarOrdemAbas() { try { localStorage.setItem('cons_ordem_abas', JSON.stringify(ABAS.map(function (a) { return a[0]; }))); } catch (e) {} }
 function aplicarOrdemAbas(ord) {
@@ -19265,7 +19300,7 @@ function carregarTetosRecom(forcar) {
     });
     var mudou = JSON.stringify(m) !== JSON.stringify(RECOM), foco = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('in-teto');
     RECOM = m;
-    if (mudou && D && R && ST.aba === 'rv' && !foco) render();
+    if (mudou && D && R && (ST.aba === 'rv' || ST.aba === 'intl') && !foco) render();
   });
 }
 // Grava o preço teto na carteira recomendada: atualiza o ativo, ou o cria na aba correspondente quando ainda não consta
@@ -19300,6 +19335,14 @@ function carregarAlvosXP() {
     r.data.forEach(function (x) {
       if (x.ticker && x.preco_alvo !== null && x.preco_alvo !== undefined && x.atualizado_em && new Date(x.atualizado_em).toDateString() === dia) m[String(x.ticker).toUpperCase()] = { alvo: Number(x.preco_alvo), upside: x.upside, empresa: x.empresa, setor: x.setor };
     });
+    var setores = {}, setoresEm = {};
+    r.data.forEach(function (x) {
+      var tk = String(x.ticker || '').toUpperCase(), st = String(x.setor || '').trim();
+      if (!tk || !st || st === 'SECTOR_XP') return;
+      if (!setoresEm[tk] || (x.atualizado_em || '') > setoresEm[tk]) { setores[tk] = st === 'Petróleo e Gás' ? 'Óleo, Gás e Petroquímicos' : st; setoresEm[tk] = x.atualizado_em || ''; }
+    });
+    SETORES = setores; SETORES_RAIZ = {};
+    Object.keys(setores).forEach(function (tk) { if (RE_TICKER_BR.test(tk)) SETORES_RAIZ[tk.slice(0, 4)] = setores[tk]; });
     var nomes = {}, nomesEm = {};
     r.data.forEach(function (x) {
       var tk = String(x.ticker || '').toUpperCase(), n = String(x.empresa || '').trim();
@@ -19308,7 +19351,7 @@ function carregarAlvosXP() {
     });
     EMPRESAS = nomes;
     XPALVO = m; XPALVO_EM = em;
-    if (D && R && ST.aba === 'rv') render();
+    if (D && R && (ST.aba === 'rv' || ST.aba === 'intl')) render();
   });
 }
 function tickerDe(p) {
@@ -19367,6 +19410,84 @@ function tabelaRV(lista, titulo, novoTipo) {
   var tot = soma(lista, function (p) { return p.saldo; });
   return t + '<tr class="total"><td class="e">Total (' + lista.length + ')</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>' + fmtBRL(tot) + '</td><td>' + fmtP(R.total > 0 ? tot / R.total * 100 : 0) + '</td><td></td><td></td><td></td></tr></tbody></table></div>';
 }
+// ── Setores e ativos internacionais ──
+// setor: cobertura da XP (tabela xp_precos_alvo); as listas abaixo atendem papéis fora da cobertura e ativos negociados no exterior
+var SETORES = {}, SETORES_RAIZ = {};
+function mapaDeCodigos(grupos) { var m = {}; Object.keys(grupos).forEach(function (k) { grupos[k].split(' ').forEach(function (t) { m[t] = k; }); }); return m; }
+var SETOR_BR = mapaDeCodigos({
+  'Bancos': 'BBAS BBDC ITUB SANB BPAC BMGB BRSR ABCB BPAN BAZA BNBR', 'Inst. Financeiras': 'ITSA BBSE CXSE PSSA IRBR B3SA WIZC',
+  'Elétricas': 'TAEE CMIG CPLE EGIE ELET AXIA ENBR TRPL ISAE ALUP NEOE A1ES', 'Saneamento': 'SAPR SBSP CSMG', 'Papel & Celulose': 'KLBN SUZB RANI',
+  'Mineração & Siderurgia': 'VALE CMIN CSNA GGBR GOAU USIM BRAP', 'Óleo, Gás e Petroquímicos': 'PETR PRIO VBBR UGPA CSAN BRKM RECV',
+  'Bens de Capital': 'WEGE LEVE POMO TUPY KEPL', 'TMT': 'VIVT TIMS TOTS', 'Alimentos & Bebidas': 'ABEV BEEF MDIA JBSS', 'Agro': 'JALL SLCE SMTO AGRO'
+});
+var SETOR_US = mapaDeCodigos({
+  'Tecnologia': 'AAPL MSFT NVDA AVGO AMD INTC IBM ORCL CRM ADBE CSCO QCOM TXN MU PLTR S IONQ QBTS RGTI CRWD PANW SNOW SHOP TSM ASML',
+  'Comunicações': 'GOOGL GOOG META NFLX DIS VZ T TMUS CMCSA', 'Consumo': 'AMZN TSLA HD MCD NKE SBUX KO PEP PG WMT COST MELI',
+  'Saúde': 'PFE ABBV JNJ UNH LLY MRK ABT TMO BMY AMGN GILD CVS MDT', 'Financeiro': 'JPM BAC WFC GS MS V MA AXP BLK C MAIN ARCC PYPL NU XP BRK.B',
+  'Imobiliário (REITs)': 'O VICI STAG DLR IIPR XRN GMRE AGNC AOMR EFC NLY PLD AMT CCI EQIX SPG WPC NNN', 'Energia': 'XOM CVX COP PBR MNR KMI OXY SLB ENB EPD ET',
+  'Indústria': 'BA CAT GE HON LMT RTX UPS DE MMM', 'Materiais': 'NEM FCX LIN VALE', 'Utilidades públicas': 'NEE DUK SO D AES'
+});
+var ETFS_US = mapaDeCodigos({ 'ETF': 'IVV VOO VTI SPY QQQ IWM IJH IJR ACWI ACWX VEA VWO VT SCHD VIG VYM LQD HYG GOVT SGOV BIL SHY IEF TLT AGG BND GLD IAU SLV SMH SOXX XLK XLF XLE XLV ARKK ARKX BOTZ HACK CIBR SNSR QTUM JEPI JEPQ' });
+function codigoDe(p) {
+  if (p.ticker) return String(p.ticker).toUpperCase();
+  var m = /^([A-Z][A-Z0-9.]{0,5})( - |$)/.exec(String(p.nome || '').trim());
+  return m ? m[1] : '';
+}
+function ehInternacional(p) { return p.chave === 'grv' || p.chave === 'grf' || p.moeda === 'USD' || p.instr === 'Internacional'; }
+function tipoInternacional(p) {
+  var tk = codigoDe(p), n = String(p.nome || '').toUpperCase();
+  if (p.tipo === 'caixa' || p.chave === 'caixa' || p.instr === 'Saldo em conta') return 'Saldo em conta';
+  if (p.tipo === 'coe' || /^COE/.test(p.instr || '')) return 'COE';
+  if (ETFS_US[tk] || /\\bETF\\b|ISHARES|VANGUARD|SPDR/.test(n)) return 'ETFs';
+  if (p.chave === 'grf') return 'Renda fixa';
+  if (SETOR_US[tk] || SETORES[tk] || p.tipo === 'acao' || (tk && SETOR_BR[tk.slice(0, 4)])) return 'Ações e REITs';
+  if (p.instr === 'Fundo de investimento' || /\\b(FUND|FIF|FIC|FIM|FIA|SICAV|ACC)\\b|PIMCO|ALLIANZ|BLACKROCK|JPM|JSS|ARTISAN|THEMATICS|ABERDEEN|MORGAN STANLEY|CAPITAL GROUP|CLEARBRIDGE/.test(n)) return 'Fundos';
+  return tk ? 'Ações e REITs' : 'Outros';
+}
+function setorAtivo(p) {
+  var tk = codigoDe(p) || tickerDe(p), raiz = tk.slice(0, 4);
+  if (ehInternacional(p)) return SETOR_US[tk] || SETORES[tk] || SETOR_BR[raiz] || 'Não classificado';
+  return SETORES[tk] || SETORES_RAIZ[raiz] || SETOR_BR[raiz] || 'Não classificado';
+}
+function ehAcaoBrasil(p) { return ehRV(p) && catRV(p) === 'Ações'; }
+function ehAcaoExterior(p) { return ehInternacional(p) && tipoInternacional(p) === 'Ações e REITs'; }
+function agruparPor(itens, fn) {
+  var m = {}, ord = [];
+  itens.forEach(function (p) { var k = fn(p); if (!m[k]) { m[k] = { r: k, v: 0, n: 0 }; ord.push(m[k]); } m[k].v += p.saldo; m[k].n++; });
+  return ord.sort(function (a, b) { return (a.r === 'Não classificado') - (b.r === 'Não classificado') || b.v - a.v; });
+}
+function fmtUS(v) { return 'US$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function valorUS(p) { return p.moeda === 'USD' && typeof p.valorMoeda === 'number' ? p.valorMoeda : null; }
+// barras horizontais da tela, com o percentual sobre o total informado
+function barrasTela(lista, total) {
+  if (!lista.length) return '<p class="vazio">Nenhum ativo.</p>';
+  var mx = Math.max.apply(null, lista.map(function (x) { return x.v; }).concat([1]));
+  return lista.map(function (x) { return '<div class="barra-linha"><span class="barra-rot">' + esc(x.r) + '</span><div class="trilho"><div class="fill" style="width:' + Math.max(x.v / mx * 100, 1.2).toFixed(2) + '%"></div></div><span class="barra-val"><b>' + fmtP(total > 0 ? x.v / total * 100 : 0, 2) + '</b><small>' + fmtRS(x.v) + '</small></span></div>'; }).join('');
+}
+PAGINAS.intl = function () {
+  var todos = R.itens.filter(ehInternacional), q = compacto(ST.busca), lista = filtrados(null).filter(ehInternacional), pi = perfilAtualIdx();
+  if (q) lista = lista.filter(function (p) { return compacto(p.nome).indexOf(q) !== -1 || compacto(codigoDe(p)).indexOf(q) !== -1 || compacto(tipoInternacional(p)).indexOf(q) !== -1 || compacto(p.inst || '').indexOf(q) !== -1; });
+  var tot = soma(todos, function (p) { return p.saldo; }), usd = soma(todos, function (p) { return valorUS(p) || 0; });
+  var alvo = soma(R.linhas.filter(function (l) { return l.chave === 'grv' || l.chave === 'grf'; }), function (l) { return l.alvo[pi] || 0; }), pct = R.total > 0 ? tot / R.total * 100 : 0;
+  var h = '<div class="barra-sl"><span class="rot-sl">Buscar</span><input type="text" id="in-busca" class="busca" placeholder="Ativo, código, tipo ou instituição" value="' + esc(ST.busca) + '" autocomplete="off"><button type="button" class="btn btn-peq" data-pos-novo="rv-int">+ Adicionar ativo</button></div>';
+  if (!todos.length) return h + '<p class="vazio">Nenhum ativo internacional na carteira.</p>';
+  h += '<div class="kpis">' + kpi('Ativos internacionais', fmtBRL(tot), todos.length + ' posição(ões) · ' + fmtP(pct, 1) + ' do patrimônio') +
+    kpi('Alvo do ' + esc(R.matriz.perfis[pi].nome), fmtP(alvo, 1), 'Global renda variável e renda fixa') +
+    kpi('Diferença para o alvo', fmtPs(pct - alvo, 1), fmtRS((pct - alvo) / 100 * R.total)) +
+    (usd > 0 ? kpi('Posições em dólar', fmtUS(usd), 'valores informados em US$') : '') + '</div><div class="tiles">';
+  var acoes = todos.filter(ehAcaoExterior), totA = soma(acoes, function (p) { return p.saldo; });
+  h += tile('t6', 'Por tipo de ativo', barrasTela(agruparPor(todos, tipoInternacional), tot));
+  h += tile('t6', 'Por instituição', barrasTela(agruparPor(todos, function (p) { return p.inst || 'Não informada'; }), tot));
+  h += tile('t12', 'Ações e REITs no exterior, por setor', barrasTela(agruparPor(acoes, setorAtivo), totA), 'percentual sobre as ações e REITs no exterior');
+  var t = '<div class="tabela-wrap"><table class="tb"><thead><tr><th class="e">Ativo</th><th class="e">Tipo</th><th class="e">Setor</th><th class="e">Instituição</th><th>Quantidade</th><th>Posição (US$)</th><th>Saldo bruto (R$)</th><th>% carteira</th><th></th></tr></thead><tbody>';
+  lista.slice().sort(function (a, b) { return b.saldo - a.saldo; }).forEach(function (p, i) {
+    var v = valorUS(p);
+    t += '<tr class="' + (i % 2 ? 'zebra' : '') + '"><td class="e">' + esc(p.nome) + '</td><td class="e">' + esc(tipoInternacional(p)) + '</td><td class="e">' + (ehAcaoExterior(p) ? esc(setorAtivo(p)) : '—') + '</td><td class="e">' + esc(p.inst || '') + '</td><td>' + (p.qtd !== undefined && p.qtd !== null ? fmtQtd(p.qtd) : '') + '</td><td>' + (v === null ? '—' : fmtUS(v)) + '</td><td>' + fmtBRL(p.saldo) + '</td><td>' + fmtP(p.pct) + '</td>' + celAcoesPos(p) + '</tr>';
+  });
+  var totL = soma(lista, function (p) { return p.saldo; });
+  t += '<tr class="total"><td class="e">Total (' + lista.length + ')</td><td></td><td></td><td></td><td></td><td>' + fmtUS(soma(lista, function (p) { return valorUS(p) || 0; })) + '</td><td>' + fmtBRL(totL) + '</td><td>' + fmtP(R.total > 0 ? totL / R.total * 100 : 0) + '</td><td></td></tr></tbody></table></div>';
+  return h + tile('t12', 'Ativos internacionais (' + lista.length + ')', t) + '</div>';
+};
 PAGINAS.rv = function () {
   carregarTetosRecom();
   var todos = R.itens.filter(ehRV), lista = filtrados(null).filter(ehRV), q = compacto(ST.busca);
@@ -19386,6 +19507,9 @@ PAGINAS.rv = function () {
   var comValor = grupos.filter(function (g) { return g.v > 0; });
   h += tile('t5', 'Por categoria', comValor.length ? donutLista(comValor, 'renda variável') : '<p class="vazio">Nenhum ativo de renda variável.</p>');
   h += tile('t7', 'Maiores posições', top.length ? top.map(function (it) { return '<div class="barra-linha"><span class="barra-rot">' + esc(it.r) + '</span><div class="trilho"><div class="fill" style="width:' + Math.max(it.v / top[0].v * 100, 1.2).toFixed(2) + '%"></div></div><span class="barra-val"><b>' + fmtP(tot > 0 ? it.v / tot * 100 : 0, 2) + '</b><small>' + fmtRS(it.v) + '</small></span></div>'; }).join('') : '<p class="vazio">Nenhum ativo de renda variável.</p>');
+  var acBR = todos.filter(ehAcaoBrasil), acEx = todos.filter(ehAcaoExterior), vBR = soma(acBR, function (p) { return p.saldo; }), vEx = soma(acEx, function (p) { return p.saldo; });
+  if (acBR.length) h += tile(acEx.length ? 't6' : 't12', 'Ações Brasil por setor', barrasTela(agruparPor(acBR, setorAtivo), vBR), 'percentual sobre as ações brasileiras');
+  if (acEx.length) h += tile(acBR.length ? 't6' : 't12', 'Ações e REITs no exterior por setor', barrasTela(agruparPor(acEx, setorAtivo), vEx), 'percentual sobre as ações no exterior');
   grupos.forEach(function (g) {
     var arr = lista.filter(g.fn);
     h += tile('t12', g.r + ' (' + arr.length + ')', tabelaRV(arr, g.r, g.tipo), g.tipo === 'rv-br' && XPALVO_EM ? 'preço alvo XP: carteira recomendada, atualizada em ' + fmtDataISO(XPALVO_EM) : '');
