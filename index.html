@@ -18087,9 +18087,26 @@ function dgSlides(d) {
   itensP += '<div class="pr"><span class="num">' + (prio.length + 1) + '</span><div><h3>Acompanhamento periódico</h3><p>Revisões periódicas com relatório de posição e ajuste de rota conforme mudanças de cenário ou de circunstância.</p></div></div>';
   S.push('<section class="slide capa fim" data-sub="PRÓXIMOS PASSOS"><div class="faixa"></div><div class="cc"><div class="marca">P R Ó X I M O S &nbsp; P A S S O S</div><h1 class="gr">PRIORIDADES<br>DE AJUSTE.</h1><div class="prs">' + itensP + '</div>' + (d.assessor ? '<div class="assin"><b>' + esc(d.assessor) + '</b><span>Faragacci Investimentos</span></div>' : '<div class="assin"><span>Faragacci Investimentos</span></div>') +
     '<p class="aviso-dg">Material de caráter meramente informativo, elaborado com base nos arquivos carregados. Não constitui oferta, solicitação ou recomendação de compra ou venda de qualquer ativo.</p></div><div class="rod-fim">Faragacci Investimentos · ' + esc(d.dataCurta) + '</div></section>');
-  return S;
+  return dgOrdenar(S);
 }
 // o "A seguir" de cada página descreve a página seguinte, qualquer que seja a composição do relatório
+// Ordem de apresentação ao cliente: situação atual e resultado, alocação e riscos, detalhe por classe, estrutura, conclusões e próximos passos
+var DG_ORDEM = ['CARTEIRA DE', 'RENTABILIDADE',
+  'ALOCAÇÃO ATUAL', 'A CARTEIRA COMPARADA', 'FATORES DE RISCO',
+  'RENDA FIXA POR INDEXADOR', 'QUALIDADE DE CRÉDITO', 'CONCENTRAÇÃO POR EMISSOR', 'RISCO DE CRÉDITO',
+  'FUNDOS E GESTORES', 'AÇÕES E ATIVOS LISTADOS', 'AÇÕES POR SETOR', 'PREÇOS ALVO', 'EXPOSIÇÃO INTERNACIONAL', 'ATIVOS INTERNACIONAIS',
+  'CUSTÓDIA', 'LIQUIDEZ',
+  'RESUMO DO DIAGNÓSTICO', 'PROJEÇÃO DE PATRIMÔNIO', 'PRÓXIMOS PASSOS'];
+function dgOrdenar(S) {
+  function posicao(s) {
+    var m = /data-sub="([^"]*)"/.exec(s.slice(0, 240));
+    if (!m) return -1;   // capa
+    for (var i = 0; i < DG_ORDEM.length; i++) if (m[1].indexOf(DG_ORDEM[i]) === 0) return i;
+    return DG_ORDEM.length - 1.5;   // tema sem posição definida: antes do encerramento
+  }
+  // páginas do mesmo tema mantêm a sequência em que foram montadas
+  return S.map(function (s, i) { return { s: s, p: posicao(s), i: i }; }).sort(function (a, b) { return a.p - b.p || a.i - b.i; }).map(function (x) { return x.s; });
+}
 function dgEncadear(S) {
   var SEGUE = [['CARTEIRA DE', 'a carteira do cliente: patrimônio, aderência ao perfil e distribuição por classe.'],
     ['PROJEÇÃO DE PATRIMÔNIO', 'a projeção de patrimônio nos cenários conservador, base e otimista.'], ['ALOCAÇÃO ATUAL', 'a alocação atual e a régua de perfis.'], ['A CARTEIRA COMPARADA', 'a mesma alocação comparada, classe a classe, com cada um dos perfis.'],
