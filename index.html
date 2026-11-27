@@ -18503,7 +18503,7 @@ if (window.setInterval) window.setInterval(function () { if (D && R && D.cotacoe
 // ── Estado, filtros cruzados e dimensões ──
 // Cada dimensão pode ter vários valores selecionados (união dentro da dimensão, interseção entre dimensões).
 // Os gráficos de uma dimensão mostram o cruzamento das DEMAIS dimensões e destacam os valores selecionados.
-var ABAS = [['geral', 'Visão geral'], ['alertas', 'Pontos de atenção'], ['rentab', 'Rentabilidade'], ['backtest', 'Backtest'], ['alocacao', 'Alocação e perfis'], ['inst', 'Instituições'], ['posicoes', 'Posições'], ['rv', 'Renda variável'], ['intl', 'Internacional'], ['rf', 'Renda fixa'], ['credito', 'Análise de crédito']];
+var ABAS = [['geral', 'Visão geral'], ['alertas', 'Pontos de atenção'], ['rentab', 'Rentabilidade'], ['backtest', 'Backtest'], ['alocacao', 'Alocação e perfis'], ['inst', 'Instituições'], ['posicoes', 'Posições'], ['rv', 'Renda variável'], ['analise', 'Análise de ativos'], ['intl', 'Internacional'], ['rf', 'Renda fixa'], ['credito', 'Análise de crédito']];
 var ABAS_DEF = ABAS.slice();
 function salvarOrdemAbas() { try { localStorage.setItem('cons_ordem_abas', JSON.stringify(ABAS.map(function (a) { return a[0]; }))); } catch (e) {} }
 function aplicarOrdemAbas(ord) {
@@ -19487,6 +19487,208 @@ PAGINAS.intl = function () {
   var totL = soma(lista, function (p) { return p.saldo; });
   t += '<tr class="total"><td class="e">Total (' + lista.length + ')</td><td></td><td></td><td></td><td></td><td>' + fmtUS(soma(lista, function (p) { return valorUS(p) || 0; })) + '</td><td>' + fmtBRL(totL) + '</td><td>' + fmtP(R.total > 0 ? totL / R.total * 100 : 0) + '</td><td></td></tr></tbody></table></div>';
   return h + tile('t12', 'Ativos internacionais (' + lista.length + ')', t) + '</div>';
+};
+// ── Análise de ativos: os mesmos indicadores da Análise de Carteira por planilha, aplicados aos ativos listados da consolidação ──
+var AN = { dados: {}, tentados: {}, carregando: false, feitos: 0, total: 0, em: null, ia: { texto: '', carregando: false, erro: '' } };
+function ativosAnalise() {
+  var m = {}, ord = [];
+  R.itens.forEach(function (p) {
+    if (p.tipo === 'rf' || p.tipo === 'coe' || p.tipo === 'caixa') return;
+    var tk = tickerDe(p);
+    if (!tk || !RE_TICKER_BR.test(tk)) return;
+    var o = m[tk];
+    if (!o) { o = m[tk] = { ticker: tk, saldo: 0, qtd: 0, semQtd: 0, tipo: p.tipo, instr: p.instr || '' }; ord.push(o); }
+    o.saldo += p.saldo;
+    if (p.qtd > 0) o.qtd += p.qtd; else o.semQtd++;
+  });
+  return ord.sort(function (a, b) { return b.saldo - a.saldo; });
+}
+function numBR(t) {
+  if (typeof t === 'number') return t;
+  var v = parseFloat(String(t || '').replace(/[^0-9,.-]/g, '').replace(/\\./g, '').replace(',', '.'));
+  return isNaN(v) ? null : v;
+}
+function pedirJson(url, ms) {
+  var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, ms || 28000);
+  var opts = { signal: ctrl.signal };
+  if (url.indexOf('brapi-proxy') === -1) opts.headers = { 'Authorization': 'Bearer ' + SB_KEY, 'apikey': SB_KEY };
+  return fetch(url, opts).then(function (r) { clearTimeout(timer); return r.ok ? r.json() : null; }).catch(function () { clearTimeout(timer); return null; });
+}
+function buscarIndicadoresAtivo(a) {
+  var base = SB_URL + '/functions/v1/', brapi = base + 'brapi-proxy/quote/' + encodeURIComponent(a.ticker);
+  function primeiro(j) { return j && j.results && j.results[0] ? j.results[0] : null; }
+  return pedirJson(brapi).then(primeiro).then(function (cot) {
+    if (!cot) return pedirJson(brapi).then(primeiro);   // segunda tentativa
+    return cot;
+  }).then(function (cot) {
+    if (!cot) return null;
+    var nome = String(cot.longName || cot.shortName || '').toUpperCase();
+    var etf = /ETF|FUNDO DE IND|INDEX FUND/.test(nome) || a.instr === 'ETF';
+    var bdr = !etf && /3[1-9]$/.test(a.ticker);
+    var fii = !etf && !bdr && (a.tipo === 'fii' || a.instr === 'Fundo imobiliário listado' || /IMOBILI|FDO INV IMOB/.test(nome) || String(cot.quoteType || '').toUpperCase() === 'FUND');
+    var pedidos = [
+      pedirJson(brapi + '?modules=summaryProfile').then(primeiro),
+      fii ? Promise.resolve(null) : pedirJson(brapi + '?fundamental=true&dividends=true&modules=defaultKeyStatistics,financialData').then(primeiro),
+      etf ? Promise.resolve(null) : pedirJson(base + (fii ? 'fii-dados-extra' : 'acoes-dados-extra') + '?ticker=' + encodeURIComponent(a.ticker), 12000)
+    ];
+    return Promise.all(pedidos).then(function (r) {
+      var d = Object.assign({}, cot, r[0] || {}, r[1] || {}), x = r[2] && !r[2].error ? r[2] : {};
+      var est = d.defaultKeyStatistics || {}, fin = d.financialData || {}, perfil = d.summaryProfile || {};
+      var preco = typeof d.regularMarketPrice === 'number' ? d.regularMarketPrice : null;
+      var lista = (d.dividendsData && d.dividendsData.cashDividends) || [], agora = new Date();
+      var umAno = new Date(agora.getFullYear() - 1, agora.getMonth(), agora.getDate());
+      var pagos12 = lista.filter(function (v) { return v.paymentDate && new Date(v.paymentDate) >= umAno && new Date(v.paymentDate) <= agora && typeof v.rate === 'number'; });
+      var futuros = lista.filter(function (v) { return v.paymentDate && new Date(v.paymentDate) > agora && typeof v.rate === 'number'; }).sort(function (u, v) { return new Date(u.paymentDate) - new Date(v.paymentDate); });
+      var dy = pagos12.length && preco ? soma(pagos12, function (v) { return v.rate; }) / preco * 100 : null;
+      if (dy === null && typeof est.dividendYield === 'number') dy = est.dividendYield * 100;
+      if (dy === null) dy = fii ? numBR(x.dividendYield12m) : (typeof x.dividendYield12m === 'number' ? x.dividendYield12m : null);
+      var pvp = typeof est.priceToBook === 'number' ? est.priceToBook : (fii ? numBR(x.pvp) : (typeof x.pvp === 'number' ? x.pvp : null));
+      var roe = typeof fin.returnOnEquity === 'number' ? fin.returnOnEquity * 100 : (typeof x.roe === 'number' ? x.roe : null);
+      var setorB = /^energ(y|ia)$/i.test(String(perfil.sector || '').trim()) ? '' : perfil.sector;
+      var segmento = etf ? 'ETF' : fii ? (x.segmento && String(x.segmento).toLowerCase() !== 'multicategoria' ? x.segmento : 'FII') : (SETORES[a.ticker] || SETORES_RAIZ[a.ticker.slice(0, 4)] || SETOR_BR[a.ticker.slice(0, 4)] || setorB || x.setor || (bdr ? 'BDR' : 'Não classificado'));
+      var valorMercado = d.marketCap || est.marketCap || null;
+      if (!valorMercado && fii && preco && x.cotasEmitidas && numBR(x.cotasEmitidas)) valorMercado = preco * numBR(x.cotasEmitidas);
+      var liq = d.averageDailyVolume3Month && preco ? fmtRS(d.averageDailyVolume3Month * preco) : (x.liquidezDiaria || '');
+      return { classe: etf ? 'etf' : fii ? 'fii' : 'acao', preco: preco, var: typeof d.regularMarketChangePercent === 'number' ? d.regularMarketChangePercent : null,
+        pl: typeof d.priceEarnings === 'number' ? d.priceEarnings : null, pvp: pvp, dy: dy, roe: roe, segmento: segmento, tipoFundo: x.tipoFundo || '', vacancia: x.vacancia || '',
+        mercado: valorMercado, liquidez: liq, proventos: lista, proximo: futuros[0] || null };
+    });
+  });
+}
+function carregarAnaliseAtivos(forcar) {
+  if (AN.carregando) return;
+  if (forcar) { AN.dados = {}; AN.tentados = {}; }
+  var fila = ativosAnalise().filter(function (a) { return !AN.tentados[a.ticker]; });
+  if (!fila.length) return;
+  AN.carregando = true; AN.feitos = 0; AN.total = fila.length;
+  function redesenhar() { if (ST.aba === 'analise') render(); }
+  function lote(i) {
+    if (i >= fila.length) {
+      AN.carregando = false; AN.em = Date.now(); redesenhar();
+      var acoes = ativosAnalise().filter(function (a) { var d = AN.dados[a.ticker]; return d && d.classe === 'acao'; }).map(function (a) { return a.ticker; });
+      if (acoes.length) pedirJson(SB_URL + '/functions/v1/resultados-calendario?tickers=' + encodeURIComponent(acoes.join(','))).then(function (j) {
+        var m = (j && j.resultados) || {};
+        Object.keys(m).forEach(function (k) { if (AN.dados[k]) AN.dados[k].resultado = m[k]; });
+        redesenhar();
+      });
+      return;
+    }
+    var parte = fila.slice(i, i + 3);
+    Promise.all(parte.map(function (a) {
+      AN.tentados[a.ticker] = true;
+      return buscarIndicadoresAtivo(a).then(function (d) { if (d) AN.dados[a.ticker] = d; AN.feitos++; }, function () { AN.feitos++; });
+    })).then(function () { redesenhar(); lote(i + 3); });
+  }
+  lote(0);
+}
+// linhas calculadas: posição consolidada, indicadores consultados e preço-alvo XP
+function linhasAnalise() {
+  return ativosAnalise().map(function (a) {
+    var d = AN.dados[a.ticker] || {}, xp = XPALVO[a.ticker] || {};
+    var qtd = a.qtd > 0 && !a.semQtd ? a.qtd : (d.preco ? a.saldo / d.preco : null), estimada = !(a.qtd > 0 && !a.semQtd);
+    var prov = null, provEst = false;
+    if (d.proximo && qtd) prov = d.proximo.rate * qtd;
+    else if (d.classe === 'fii' && d.dy !== null && d.dy !== undefined) { prov = a.saldo * d.dy / 100 / 12; provEst = true; }
+    var upside = xp.alvo && d.preco ? (xp.alvo / d.preco - 1) * 100 : (xp.upside !== undefined && xp.upside !== null ? Number(xp.upside) : null);
+    return { a: a, d: d, qtd: qtd, estimada: estimada, prov: prov, provEst: provEst, alvo: xp.alvo || null, upside: upside, anual: d.dy !== null && d.dy !== undefined ? a.saldo * d.dy / 100 : null };
+  });
+}
+function mediaPonderada(linhas, fn) {
+  var n = 0, d = 0;
+  linhas.forEach(function (l) { var v = fn(l); if (v !== null && v !== undefined && !isNaN(v)) { n += v * l.a.saldo; d += l.a.saldo; } });
+  return d > 0 ? n / d : null;
+}
+function celNum(v, casas, suf) { return v === null || v === undefined || isNaN(v) ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }) + (suf || ''); }
+function celSinal(v) { return v === null || v === undefined || isNaN(v) ? '<td>—</td>' : '<td class="' + (v >= 0 ? 'pos' : 'neg') + '">' + (v >= 0 ? '▲ ' : '▼ ') + celNum(Math.abs(v), 2, '%') + '</td>'; }
+function tabelaAnalise(linhas, fii) {
+  var cab = ['Ativo', fii ? 'Segmento' : 'Setor'].concat(fii ? ['Tipo de FII'] : [], ['Quantidade', 'Posição', 'Cotação', 'Var. dia'], fii ? [] : ['P/L'], ['P/VP', 'DY (12m)'], fii ? [] : ['ROE'], ['Próximo provento', 'Preço-alvo XP', 'Upside', 'Valor de mercado', 'Liquidez diária'], fii ? ['Vacância'] : []);
+  var h = '<div class="tabela-wrap"><table class="tb"><thead><tr>' + cab.map(function (c, i) { return '<th' + (i < (fii ? 3 : 2) ? ' class="e"' : '') + '>' + c + '</th>'; }).join('') + '</tr></thead><tbody>';
+  linhas.forEach(function (l, i) {
+    var d = l.d;
+    h += '<tr class="' + (i % 2 ? 'zebra' : '') + '"><td class="e"><b>' + esc(l.a.ticker) + '</b></td><td class="e">' + esc(d.segmento || (AN.tentados[l.a.ticker] && !AN.carregando ? 'Não consultado' : '…')) + '</td>' + (fii ? '<td class="e">' + esc(d.tipoFundo || '—') + '</td>' : '') +
+      '<td>' + (l.qtd ? fmtQtd(Math.round(l.qtd * 100) / 100) + (l.estimada ? '*' : '') : '—') + '</td><td>' + fmtBRL(l.a.saldo) + '</td><td>' + (d.preco ? fmtBRL(d.preco) : '—') + '</td>' + celSinal(d.var) + (fii ? '' : '<td>' + celNum(d.pl, 2) + '</td>') +
+      '<td>' + celNum(d.pvp, 2) + '</td><td>' + celNum(d.dy, 2, '%') + '</td>' + (fii ? '' : '<td>' + celNum(d.roe, 2, '%') + '</td>') +
+      '<td>' + (l.prov ? fmtBRL(l.prov) + (l.provEst ? '†' : '') : '—') + '</td><td>' + (l.alvo ? fmtBRL(l.alvo) : '—') + '</td>' + celSinal(l.upside) +
+      '<td>' + (d.mercado ? (d.mercado >= 1e9 ? 'R$ ' + celNum(d.mercado / 1e9, 2, ' bi') : 'R$ ' + celNum(d.mercado / 1e6, 2, ' mi')) : '—') + '</td><td>' + esc(d.liquidez || '—') + '</td>' + (fii ? '<td>' + esc(d.vacancia || '—') + '</td>' : '') + '</tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+function tabelaHistProventos(linhas) {
+  var ano = new Date().getFullYear(), anos = [ano - 4, ano - 3, ano - 2, ano - 1, ano], hoje = new Date().toISOString().slice(0, 10), tot = {}, corpo = '', n = 0;
+  linhas.forEach(function (l) {
+    if (!l.qtd || !l.d.proventos || !l.d.proventos.length) return;
+    var por = {}, tem = false;
+    l.d.proventos.forEach(function (v) {
+      var ref = String(v.paymentDate || v.exDate || '').slice(0, 10), a = Number(ref.slice(0, 4)), taxa = Number(v.rate);
+      if (!ref || ref > hoje || a < anos[0] || !taxa) return;
+      por[a] = (por[a] || 0) + taxa * l.qtd; tem = true;
+    });
+    if (!tem) return;
+    corpo += '<tr class="' + (n++ % 2 ? 'zebra' : '') + '"><td class="e"><b>' + esc(l.a.ticker) + '</b>' + (l.estimada ? '*' : '') + '</td>' + anos.map(function (a) { tot[a] = (tot[a] || 0) + (por[a] || 0); return '<td>' + (por[a] ? fmtBRL(por[a]) : '—') + '</td>'; }).join('') + '</tr>';
+  });
+  if (!n) return '';
+  return '<div class="tabela-wrap"><table class="tb"><thead><tr><th class="e">Ativo</th>' + anos.map(function (a) { return '<th>' + a + (a === ano ? ' (até hoje)' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' + corpo +
+    '<tr class="total"><td class="e">Total</td>' + anos.map(function (a) { return '<td>' + fmtBRL(tot[a] || 0) + '</td>'; }).join('') + '</tr></tbody></table></div>';
+}
+function tabelaDivulgacoes(linhas) {
+  var arr = linhas.filter(function (l) { return l.d.resultado && l.d.resultado.data; }).sort(function (a, b) { return a.d.resultado.data < b.d.resultado.data ? -1 : 1; });
+  if (!arr.length) return '';
+  return '<div class="tabela-wrap"><table class="tb"><thead><tr><th class="e">Ativo</th><th class="e">Trimestre</th><th>Data de divulgação</th><th class="e">Situação</th></tr></thead><tbody>' + arr.map(function (l, i) {
+    var r = l.d.resultado;
+    return '<tr class="' + (i % 2 ? 'zebra' : '') + '"><td class="e"><b>' + esc(l.a.ticker) + '</b></td><td class="e">' + esc(r.trimestre || '—') + '</td><td>' + fmtDataISO(r.data) + '</td><td class="e">' + (r.estimada ? 'Estimada' : 'Prevista') + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
+// comentário gerado pela mesma função de Insights da análise por planilha (somente totais agregados; sem nome do cliente)
+function gerarInsightAnalise(modo) {
+  if (AN.ia.carregando) return;
+  var ls = linhasAnalise(), tot = soma(ls, function (l) { return l.a.saldo; }), seg = {};
+  ls.forEach(function (l) { var k = l.d.segmento || 'Sem segmento'; seg[k] = (seg[k] || 0) + l.a.saldo; });
+  var dy = mediaPonderada(ls, function (l) { return l.d.dy; }), up = mediaPonderada(ls, function (l) { return l.d.classe === 'acao' ? l.upside : null; });
+  var resumo = { totalInvestido: tot, qtdAtivos: ls.length, dyMedioPct: dy === null ? undefined : dy, upsideMedioPct: up === null ? undefined : up, porSegmento: seg,
+    maioresPosicoes: ls.slice(0, 5).map(function (l) { return { ticker: l.a.ticker, valor: l.a.saldo, pesoPct: tot ? l.a.saldo / tot * 100 : 0 }; }) };
+  AN.ia = { texto: '', carregando: true, erro: '' }; render();
+  fetch(SB_URL + '/functions/v1/portfolio-insights', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SB_KEY, 'apikey': SB_KEY }, body: JSON.stringify({ secao: 'rv', resumo: resumo, modo: modo, promptCustom: null }) })
+    .then(function (r) { return r.json(); }).then(function (j) { AN.ia = j && j.insight ? { texto: j.insight, carregando: false, erro: '' } : { texto: '', carregando: false, erro: (j && j.error) || 'Não foi possível gerar a análise.' }; render(); })
+    .catch(function () { AN.ia = { texto: '', carregando: false, erro: 'Não foi possível gerar a análise. Tente novamente.' }; render(); });
+}
+document.addEventListener('click', function (ev) {
+  var t = ev.target && ev.target.closest ? ev.target.closest('[data-an]') : null;
+  if (!t) return;
+  var acao = t.getAttribute('data-an');
+  if (acao === 'atualizar') { carregarAnaliseAtivos(true); render(); return; }
+  if (acao === 'copiar') { if (navigator.clipboard) navigator.clipboard.writeText(AN.ia.texto).then(function () { t.textContent = '✓ Copiado'; }); return; }
+  gerarInsightAnalise(acao);
+});
+PAGINAS.analise = function () {
+  var ativos = ativosAnalise();
+  if (!ativos.length) return '<p class="vazio">Nenhuma ação, fundo imobiliário, ETF ou BDR com código de negociação na carteira.</p>';
+  if (!ST.imprimir && !AN.carregando && ativos.some(function (a) { return !AN.tentados[a.ticker]; })) setTimeout(carregarAnaliseAtivos, 0);
+  var q = compacto(ST.busca), todas = linhasAnalise(), ls = todas;
+  if (q) ls = ls.filter(function (l) { return compacto(l.a.ticker).indexOf(q) !== -1 || compacto(l.d.segmento || '').indexOf(q) !== -1; });
+  var tot = soma(todas, function (l) { return l.a.saldo; }), dy = mediaPonderada(todas, function (l) { return l.d.dy; }), up = mediaPonderada(todas, function (l) { return l.d.classe === 'acao' ? l.upside : null; });
+  var provs = soma(todas, function (l) { return l.prov || 0; }), anual = soma(todas, function (l) { return l.anual || 0; });
+  var h = '<div class="barra-sl"><span class="rot-sl">Buscar</span><input type="text" id="in-busca" class="busca" placeholder="Código ou setor" value="' + esc(ST.busca) + '" autocomplete="off"><button type="button" class="btn btn-peq" data-an="atualizar"' + (AN.carregando ? ' disabled' : '') + '>↻ Atualizar indicadores</button><span style="font-size:12px;color:var(--ink-soft);">' + (AN.carregando ? 'Consultando ' + AN.feitos + ' de ' + AN.total + ' ativos…' : AN.em ? 'Consultado em ' + esc(dataHoraBR(new Date(AN.em).toISOString())) : '') + '</span></div>';
+  h += '<div class="kpis">' + kpi('Ativos analisados', fmtBRL(tot), todas.length + ' ativo(s) · ' + fmtP(R.total > 0 ? tot / R.total * 100 : 0, 1) + ' do patrimônio') +
+    kpi('Dividend yield (12m)', dy === null ? '—' : fmtP(dy, 2), 'média ponderada pela posição') +
+    kpi('Proventos em 12 meses', anual > 0 ? fmtBRL(anual) : '—', 'estimativa pelo dividend yield') +
+    kpi('Próximos proventos', provs > 0 ? fmtBRL(provs) : '—', 'anunciados e estimativa mensal dos FIIs') +
+    kpi('Upside XP das ações', up === null ? '—' : fmtPs(up, 2), 'média das ações com preço-alvo') + '</div><div class="tiles">';
+  var grupos = [['Ações e BDRs', function (c) { return c === 'acao'; }, false], ['Fundos imobiliários', function (c) { return c === 'fii'; }, true], ['ETFs', function (c) { return c === 'etf'; }, false]];
+  grupos.forEach(function (g) {
+    var arr = ls.filter(function (l) { return g[1](l.d.classe || (l.a.tipo === 'fii' ? 'fii' : l.a.tipo === 'etf' ? 'etf' : 'acao')); });
+    if (arr.length) h += tile('t12', g[0] + ' (' + arr.length + ')', tabelaAnalise(arr, g[2]), fmtRS(soma(arr, function (l) { return l.a.saldo; })));
+  });
+  h += '</div><p class="resumo" style="font-size:12px;">* Quantidade calculada pela posição e pela cotação, por não constar na carteira. † Estimativa mensal pelo dividend yield dos últimos 12 meses, sem anúncio confirmado. A posição é a registrada na consolidação. Fontes: Brapi, Investidor10 e carteira recomendada XP; confirme os dados antes de qualquer decisão.</p><div class="tiles">';
+  var hist = tabelaHistProventos(ls.filter(function (l) { return l.d.classe === 'acao'; })), div = tabelaDivulgacoes(ls);
+  if (hist) h += tile('t12', 'Histórico anual de dividendos', hist, 'proventos por ação × quantidade atual; somente ativos com histórico disponível na fonte');
+  if (div) h += tile('t12', 'Próximas divulgações de resultado', div, 'fonte: Yahoo Finance');
+  if (!MODO_CLIENTE) {
+    var bt = [['imparcial', 'Análise imparcial'], ['chamar_atencao', 'Chamar atenção'], ['positiva', 'Pontos positivos'], ['negativa', 'Pontos de risco']];
+    h += tile('t12', 'Insights', '<div class="barra-sl">' + bt.map(function (b) { return '<button type="button" class="btn btn-peq" data-an="' + b[0] + '"' + (AN.ia.carregando || AN.carregando ? ' disabled' : '') + '>' + b[1] + '</button>'; }).join('') + '</div>' +
+      (AN.ia.carregando ? '<p class="resumo">Gerando a análise…</p>' : '') + (AN.ia.erro ? '<p class="resumo neg">' + esc(AN.ia.erro) + '</p>' : '') +
+      (AN.ia.texto ? '<div style="white-space:pre-wrap;line-height:1.6;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;">' + esc(AN.ia.texto) + '</div><button type="button" class="btn btn-peq" data-an="copiar">Copiar texto</button>' : ''), 'gerados somente ao clicar; utiliza apenas totais agregados');
+  }
+  return h + '</div>';
 };
 PAGINAS.rv = function () {
   carregarTetosRecom();
