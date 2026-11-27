@@ -18021,19 +18021,21 @@ function dgSlides(d) {
       if (!o) { o = mI[k] = { nome: p.nome, tipo: tipoInternacional(p), insts: [], saldo: 0, pct: 0, qtd: 0, temQtd: 0, semQtd: 0, usd: 0, temUsd: 0, semUsd: 0 }; ativosInt.push(o); }
       if (String(p.nome).length > o.nome.length) o.nome = p.nome;
       o.saldo += p.saldo; o.pct += p.pct || 0;
+      if (!o.r12) o.r12 = rent12(p);
       if (p.inst && o.insts.indexOf(p.inst) === -1) o.insts.push(p.inst);
       if (p.qtd > 0) { o.qtd += p.qtd; o.temQtd++; } else o.semQtd++;
       var u = valorUS(p); if (u === null) o.semUsd++; else { o.usd += u; o.temUsd++; }
     });
     ativosInt.sort(function (a, b) { return b.saldo - a.saldo; });
-    var POR_INT = 11, nInt = Math.ceil(ativosInt.length / POR_INT), vInt = soma(listaInt, function (p) { return p.saldo; }), uInt = soma(listaInt, function (p) { return valorUS(p) || 0; });
+    var POR_INT = 10, nInt = Math.ceil(ativosInt.length / POR_INT), vInt = soma(listaInt, function (p) { return p.saldo; }), uInt = soma(listaInt, function (p) { return valorUS(p) || 0; });
     for (var pI = 0; pI < nInt; pI++) {
       var parte = ativosInt.slice(pI * POR_INT, (pI + 1) * POR_INT), fim = pI === nInt - 1;
       add('ATIVOS INTERNACIONAIS' + (nInt > 1 ? ' · ' + (pI + 1) + ' DE ' + nInt : ''), ativosInt.length + (ativosInt.length === 1 ? ' ativo internacional' : ' ativos internacionais') + ', somando ' + esc(fmtRS(vInt)) + ' (' + dgPct(tot > 0 ? vInt / tot * 100 : 0, 1) + ' do patrimônio).',
-        '<table class="tab-dg"><thead><tr><th class="e">Ativo</th><th class="e">Tipo</th><th class="e">Instituição</th><th>Quantidade</th><th>Posição (US$)</th><th>Posição (R$)</th><th>% carteira</th></tr></thead><tbody>' + parte.map(function (o) {
-          return '<tr><td class="e">' + esc(o.nome) + '</td><td class="e">' + esc(o.tipo) + '</td><td class="e">' + esc(o.insts.join(', ')) + '</td><td>' + (o.temQtd ? fmtQtd(o.qtd) + (o.semQtd ? '*' : '') : '—') + '</td><td>' + (o.temUsd ? fmtUS(o.usd) + (o.semUsd ? '*' : '') : '—') + '</td><td>' + fmtRS(o.saldo) + '</td><td>' + dgPct(o.pct, 2) + '</td></tr>';
-        }).join('') + (fim ? '<tr class="sub"><td class="e" colspan="4"><b>Total</b></td><td><b>' + (uInt > 0 ? fmtUS(uInt) : '—') + '</b></td><td><b>' + fmtRS(vInt) + '</b></td><td><b>' + dgPct(tot > 0 ? vInt / tot * 100 : 0, 2) + '</b></td></tr>' : '') + '</tbody></table>' +
+        '<table class="tab-dg"><thead><tr><th class="e">Ativo</th><th class="e">Tipo</th><th class="e">Instituição</th><th>Quantidade</th><th>Posição (US$)</th><th>Posição (R$)</th><th>% carteira</th><th>12 meses</th></tr></thead><tbody>' + parte.map(function (o) {
+          return '<tr><td class="e">' + esc(o.nome) + '</td><td class="e">' + esc(o.tipo) + '</td><td class="e">' + esc(o.insts.join(', ')) + '</td><td>' + (o.temQtd ? fmtQtd(o.qtd) + (o.semQtd ? '*' : '') : '—') + '</td><td>' + (o.temUsd ? fmtUS(o.usd) + (o.semUsd ? '*' : '') : '—') + '</td><td>' + fmtRS(o.saldo) + '</td><td>' + dgPct(o.pct, 2) + '</td>' + (o.r12 ? '<td' + (o.r12.v < 0 ? ' class="neg-dg"' : '') + '>' + fmtPs(o.r12.v, 2) + (o.r12.fonte === 'arq' ? '†' : '') + '</td>' : '<td>—</td>') + '</tr>';
+        }).join('') + (fim ? '<tr class="sub"><td class="e" colspan="4"><b>Total</b></td><td><b>' + (uInt > 0 ? fmtUS(uInt) : '—') + '</b></td><td><b>' + fmtRS(vInt) + '</b></td><td><b>' + dgPct(tot > 0 ? vInt / tot * 100 : 0, 2) + '</b></td><td></td></tr>' : '') + '</tbody></table>' +
         (parte.some(function (o) { return (o.temQtd && o.semQtd) || (o.temUsd && o.semUsd); }) ? '<p class="nt">* Valor parcial: parte das posições não informa este dado.</p>' : '') +
+        '<p class="nt">' + NOTA_R12 + (parte.some(function (o) { return o.r12 && o.r12.fonte === 'arq'; }) ? ' † Percentual informado no arquivo da carteira.' : '') + ' Rentabilidade passada não representa garantia de resultados futuros.</p>' +
         (fim ? '<p class="nt">A coluna em dólar considera as posições informadas em US$; as demais são mantidas em reais.</p>' : ''), '-');
     }
   }
@@ -18197,8 +18199,14 @@ function dgRotulo(k) {
   var t = k.charAt(0) + k.slice(1).toLowerCase();
   return t.split('fgc').join('FGC');
 }
-function abrirDiagnostico() {
+function abrirDiagnostico(jaConsultou) {
   if (!D || !R) { alert('Carregue a carteira antes de gerar o diagnóstico.'); return; }
+  if (jaConsultou !== true && (R12_PEND || pendentesR12().length)) {
+    var btD = document.getElementById('btn-diagnostico'), rotuloD = btD.textContent;
+    btD.disabled = true; btD.textContent = 'Consultando rentabilidades…';
+    carregarR12().then(function () { btD.disabled = false; btD.textContent = rotuloD; abrirDiagnostico(true); });
+    return;
+  }
   var d = dgDados(), slides = dgSlides(d), grupos = [], porChave = {}, fora = [];
   slides.forEach(function (s) {
     var k = dgChave(s);
@@ -19481,7 +19489,52 @@ function barrasTela(lista, total) {
   var mx = Math.max.apply(null, lista.map(function (x) { return x.v; }).concat([1]));
   return lista.map(function (x) { return '<div class="barra-linha"><span class="barra-rot">' + esc(x.r) + '</span><div class="trilho"><div class="fill" style="width:' + Math.max(x.v / mx * 100, 1.2).toFixed(2) + '%"></div></div><span class="barra-val"><b>' + fmtP(total > 0 ? x.v / total * 100 : 0, 2) + '</b><small>' + fmtRS(x.v) + '</small></span></div>'; }).join('');
 }
+// Rentabilidade em 12 meses dos ativos internacionais: variação do preço de fechamento (Yahoo Finance), sem dividendos;
+// para fundos sem código de negociação, as cotas informadas à CVM ou o percentual do próprio arquivo
+var R12 = {}, R12_TENT = {}, R12_PEND = null;
+function simboloR12(p) {
+  var tk = codigoDe(p) || tickerDe(p);
+  if (!tk) return '';
+  var tipo = tipoInternacional(p);
+  if (!p.ticker && tipo !== 'Ações e REITs' && tipo !== 'ETFs') return '';
+  return RE_TICKER_BR.test(tk) ? tk + '.SA' : tk.replace('.', '-');
+}
+function variacao12m(diario) {
+  if (!diario || diario.length < 2) return null;
+  var ult = diario[diario.length - 1], alvo = ult[0] - 10000, base = null;
+  diario.forEach(function (x) { if (x[0] <= alvo) base = x; });
+  return base && base[1] > 0 ? { v: (ult[1] / base[1] - 1) * 100, data: ult[0] } : null;
+}
+function pendentesR12() {
+  var m = {};
+  R.itens.filter(ehInternacional).forEach(function (p) { var sim = simboloR12(p); if (sim && !R12_TENT[sim]) m[sim] = 1; });
+  return Object.keys(m);
+}
+function carregarR12() {
+  if (R12_PEND) return R12_PEND;
+  var falta = pendentesR12(), lotes = [];
+  if (!falta.length) return Promise.resolve();
+  for (var i = 0; i < falta.length; i += 12) lotes.push(falta.slice(i, i + 12));
+  R12_PEND = Promise.all(lotes.map(function (l) {
+    var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 25000);
+    return fetch(SB_URL + '/functions/v1/cotacoes-yahoo?historico=1&s=' + encodeURIComponent(l.join(',')), { signal: ctrl.signal }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.historico) return;
+      Object.keys(j.historico).forEach(function (k) { var v = variacao12m(j.historico[k].diario); if (v) R12[k] = v; });
+    }).catch(function () {}).then(function () { clearTimeout(timer); l.forEach(function (x) { R12_TENT[x] = true; }); });
+  })).then(function () { R12_PEND = null; if (D && R && ST.aba === 'intl') render(); });
+  return R12_PEND;
+}
+function rent12(p) {
+  var sim = simboloR12(p);
+  if (sim && R12[sim]) return { v: R12[sim].v, fonte: 'cot' };
+  var f = RENT_FUNDOS[compacto(p.nome)];
+  if (f && f.r12 !== null && f.r12 !== undefined) return { v: Number(f.r12), fonte: 'cvm' };
+  if (p.m12 !== null && p.m12 !== undefined && p.m12 !== '' && !isNaN(Number(p.m12))) return { v: Number(p.m12), fonte: 'arq' };
+  return null;
+}
+var NOTA_R12 = '12 meses: variação do preço na moeda de negociação, sem dividendos e sem variação cambial; fundos pelas cotas informadas à CVM.';
 PAGINAS.intl = function () {
+  if (!ST.imprimir && !R12_PEND && pendentesR12().length) setTimeout(carregarR12, 0);
   var todos = R.itens.filter(ehInternacional), q = compacto(ST.busca), lista = filtrados(null).filter(ehInternacional), pi = perfilAtualIdx();
   if (q) lista = lista.filter(function (p) { return compacto(p.nome).indexOf(q) !== -1 || compacto(codigoDe(p)).indexOf(q) !== -1 || compacto(tipoInternacional(p)).indexOf(q) !== -1 || compacto(p.inst || '').indexOf(q) !== -1; });
   var tot = soma(todos, function (p) { return p.saldo; }), usd = soma(todos, function (p) { return valorUS(p) || 0; });
@@ -19496,13 +19549,14 @@ PAGINAS.intl = function () {
   h += tile('t6', 'Por tipo de ativo', barrasTela(agruparPor(todos, tipoInternacional), tot));
   h += tile('t6', 'Por instituição', barrasTela(agruparPor(todos, function (p) { return p.inst || 'Não informada'; }), tot));
   h += tile('t12', 'Ações e REITs no exterior, por setor', barrasTela(agruparPor(acoes, setorAtivo), totA), 'percentual sobre as ações e REITs no exterior');
-  var t = '<div class="tabela-wrap"><table class="tb"><thead><tr><th class="e">Ativo</th><th class="e">Tipo</th><th class="e">Setor</th><th class="e">Instituição</th><th>Quantidade</th><th>Posição (US$)</th><th>Saldo bruto (R$)</th><th>% carteira</th><th></th></tr></thead><tbody>';
+  var t = '<div class="tabela-wrap"><table class="tb"><thead><tr><th class="e">Ativo</th><th class="e">Tipo</th><th class="e">Setor</th><th class="e">Instituição</th><th>Quantidade</th><th>Posição (US$)</th><th>Saldo bruto (R$)</th><th>% carteira</th><th>12 meses</th><th></th></tr></thead><tbody>';
   lista.slice().sort(function (a, b) { return b.saldo - a.saldo; }).forEach(function (p, i) {
-    var v = valorUS(p);
-    t += '<tr class="' + (i % 2 ? 'zebra' : '') + '"><td class="e">' + esc(p.nome) + '</td><td class="e">' + esc(tipoInternacional(p)) + '</td><td class="e">' + (ehAcaoExterior(p) ? esc(setorAtivo(p)) : '—') + '</td><td class="e">' + esc(p.inst || '') + '</td><td>' + (p.qtd !== undefined && p.qtd !== null ? fmtQtd(p.qtd) : '') + '</td><td>' + (v === null ? '—' : fmtUS(v)) + '</td><td>' + fmtBRL(p.saldo) + '</td><td>' + fmtP(p.pct) + '</td>' + celAcoesPos(p) + '</tr>';
+    var v = valorUS(p), r12 = rent12(p);
+    t += '<tr class="' + (i % 2 ? 'zebra' : '') + '"><td class="e">' + esc(p.nome) + '</td><td class="e">' + esc(tipoInternacional(p)) + '</td><td class="e">' + (ehAcaoExterior(p) ? esc(setorAtivo(p)) : '—') + '</td><td class="e">' + esc(p.inst || '') + '</td><td>' + (p.qtd !== undefined && p.qtd !== null ? fmtQtd(p.qtd) : '') + '</td><td>' + (v === null ? '—' : fmtUS(v)) + '</td><td>' + fmtBRL(p.saldo) + '</td><td>' + fmtP(p.pct) + '</td>' + (r12 ? '<td class="' + (r12.v >= 0 ? 'pos' : 'neg') + '">' + fmtPs(r12.v, 2) + (r12.fonte === 'arq' ? '†' : '') + '</td>' : '<td>' + (simboloR12(p) && !R12_TENT[simboloR12(p)] ? '…' : '—') + '</td>') + celAcoesPos(p) + '</tr>';
   });
   var totL = soma(lista, function (p) { return p.saldo; });
-  t += '<tr class="total"><td class="e">Total (' + lista.length + ')</td><td></td><td></td><td></td><td></td><td>' + fmtUS(soma(lista, function (p) { return valorUS(p) || 0; })) + '</td><td>' + fmtBRL(totL) + '</td><td>' + fmtP(R.total > 0 ? totL / R.total * 100 : 0) + '</td><td></td></tr></tbody></table></div>';
+  t += '<tr class="total"><td class="e">Total (' + lista.length + ')</td><td></td><td></td><td></td><td></td><td>' + fmtUS(soma(lista, function (p) { return valorUS(p) || 0; })) + '</td><td>' + fmtBRL(totL) + '</td><td>' + fmtP(R.total > 0 ? totL / R.total * 100 : 0) + '</td><td></td><td></td></tr></tbody></table></div>';
+  t += '<p class="resumo" style="font-size:12px;margin-top:8px;">' + NOTA_R12 + ' † Percentual informado no arquivo da carteira.</p>';
   return h + tile('t12', 'Ativos internacionais (' + lista.length + ')', t) + '</div>';
 };
 // ── Análise de ativos: os mesmos indicadores da Análise de Carteira por planilha, aplicados aos ativos listados da consolidação ──
